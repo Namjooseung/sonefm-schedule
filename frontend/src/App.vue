@@ -12,7 +12,7 @@ const MENUS = [
 ]
 const LATER = ['방송일지', '보고서', '유튜브']
 
-const current = ref('programs')
+const current = ref('schedule')
 </script>
 
 <template>

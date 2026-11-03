@@ -16,6 +16,7 @@ from app.db.connection import open_db
 from app.domain import programs as program_rules
 from app.repository import meta_repo
 from app.services import programs as program_service
+from app.services import schedule as schedule_service
 
 log = logging.getLogger("sonefm.api")
 
@@ -74,3 +75,13 @@ class Api:
 
     def create_special(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._run("create_special", lambda c: program_service.create_special(c, payload))
+
+    # ── 편성표 ────────────────────────────────────
+    def get_month(self, year: int, month: int) -> dict[str, Any]:
+        return self._run("get_month", lambda c: schedule_service.get_month(c, year, month))
+
+    def generate_month(self, year: int, month: int, scope: str,
+                       overwrite_manual: bool = False) -> dict[str, Any]:
+        """scope: first_week(첫 주 불러오기) | rest(월단위 생성) | all"""
+        return self._run("generate_month", lambda c: schedule_service.generate(
+            c, year, month, scope, bool(overwrite_manual)))

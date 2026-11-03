@@ -1,4 +1,13 @@
 /* 공통 요소 스타일. 값은 tokens.css 변수만 쓴다. */
+
+/* Pretendard (OFL-1.1). 오프라인 앱이라 로컬 파일을 빌드에 포함한다 */
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("../assets/fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {

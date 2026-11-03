@@ -113,6 +113,15 @@ def test_결방_기록이_있으면_규칙칸을_만들지_않음():
     assert plan.upserts == []
 
 
+def test_결방_자리를_채운_칸은_덮어쓰기에서도_보호():
+    # 11/3 원래 p 본방 → 결방 기록 + 그 자리에 특집(manual). 덮어쓰기로 다시 생성해도 특집은 그대로
+    p = prog("p")
+    rule, _ = _gen([p], [slot("s", "p", 1, 11)], FIRST_WEEK)
+    special = cell("2026-11-03", 11, "special", source="manual")
+    plan = _plan(rule, [special], cancellations=[("p", D("2026-11-03"), 11)], overwrite=True)
+    assert plan.manual_conflicts == [] and plan.upserts == [] and plan.deletes == []
+
+
 def test_일회성_예외는_퍼지지_않음():
     # 11/3 칸을 특집으로 바꾼 상태에서 월단위 생성 → 다른 주는 원래 프로그램
     p = prog("p")

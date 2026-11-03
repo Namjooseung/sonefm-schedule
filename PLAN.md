@@ -138,7 +138,7 @@ SoneFM(수원공동체라디오, 96.3MHz)의 월간 편성표를 지금은 엑�
 ### 3.2 편성표 화면
 - 상단: 연도 + 월 탭(이전/다음), 월 상태 배지, 보기 밀도(기본/압축), 버튼(첫 주 불러오기 / 월단위 생성 / 확정 / 마감 / 엑셀 내보내기).
 - 본문: 주 단위 줄. 각 줄 = 월~일 7열 × 06~22시 17행 그리드. 날짜 헤더에 공휴일 표시.
-- 각 주 줄 왼쪽 위에 그 달 주차(예: `1주`)와 연간 주차(ISO 8601 기준, 예: `45주차`)를 함께 표시.
+- 각 주 줄 왼쪽 위에 그 달 주차(예: `1주`)와 연간 주차(ISO 8601 기준, 예: `45주차`)를 함께 표시. (2026-11-03 확정: 기존 엑셀의 주차 번호는 틀린 곳이 많아 따르지 않음. 예: 9/21 주 = 39주차)
 - 고정 편성(06시 굿모닝!, 22시 굿바이!)은 7일을 가로로 합친 한 줄 띠로 크게 표시. 칸별 편집 대상이 아니며, 특정 날만 바꿔야 하면 띠를 클릭해 날짜를 골라 예외 처리.
 - 칸 표시: 프로그램명, 회차(예: `23화`), 본방/재방 구분, 예외 아이콘(결방·교체·특집·실제 변경), 준비 상태 점.
 - 색 구분: 기본은 교양/오락 계열 색, 본방은 진하게 재방은 연하게. 사람이 손댄 칸은 테두리 강조.
@@ -281,8 +281,9 @@ sonefm-scheduler/
     src/
       views/ScheduleView.vue, ProgramsView.vue, SettingsView.vue
       components/MonthGrid.vue, WeekRow.vue, CellPopup.vue, ValidationPanel.vue,
-                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue
+                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue, MonthDial.vue
       styles/tokens.css, base.css
+      assets/fonts/PretendardVariable.woff2 (OFL-1.1, 빌드 시 HTML에 포함)
       api.js                -- window.pywebview.api 래퍼
   tests/
   packaging/

@@ -97,9 +97,12 @@ def plan_generation(
     plan = GenerationPlan()
     for key in sorted(keys):
         rule = rule_cells.get(key)
-        if rule is not None and (rule.program_id, key[0], key[1]) in cancellations:
-            rule = None
         cur = existing.get(key)
+        if rule is not None and (rule.program_id, key[0], key[1]) in cancellations:
+            # 결방된 원래 칸: 그 자리를 채운 사람 칸(교체·특집)은 건드리지 않는다
+            if cur is not None and cur.source != "manual":
+                plan.deletes.append(key)
+            continue
 
         if cur is not None and cur.source == "manual":
             differs = rule is None or not _same(rule, cur)

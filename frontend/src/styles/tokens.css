@@ -31,11 +31,16 @@
   --red-500: oklch(0.591 0.197 22);
   --red-600: oklch(0.505 0.196 24);
   --red-700: oklch(0.439 0.180 28);
+  --cyan-050: oklch(0.974 0.012 210);
   --cyan-100: oklch(0.906 0.041 212);
+  --cyan-500: oklch(0.558 0.100 220);
   --cyan-600: oklch(0.474 0.088 223);
+  --yellow-050: oklch(0.978 0.023 85);
   --yellow-100: oklch(0.910 0.098 85);
+  --yellow-400: oklch(0.675 0.143 74);
   --yellow-600: oklch(0.491 0.113 62);
   --violet-100: oklch(0.915 0.051 305);
+  --violet-500: oklch(0.588 0.207 290);
   --violet-600: oklch(0.503 0.208 290);
   --white: oklch(1 0 0);
   --black: oklch(0 0 0);
@@ -95,6 +100,29 @@
   --color-category-ent-fg: var(--yellow-600);
   --color-special-bg: var(--violet-100);
   --color-special-fg: var(--violet-600);
+
+  /* ── 편성표 칸 (새 역할) ──
+     분야 계열색. 본방은 진하게(100), 재방은 연하게(050). 왼쪽 3px 막대가 분야 표시 */
+  --cell-edu-on: var(--cyan-100);
+  --cell-edu-re: var(--cyan-050);
+  --cell-edu-bar: var(--cyan-500);
+  --cell-ent-on: var(--yellow-100);
+  --cell-ent-re: var(--yellow-050);
+  --cell-ent-bar: var(--yellow-400);
+  --cell-special-bg: var(--violet-100);
+  --cell-special-bar: var(--violet-500);
+  --cell-fixed-bg: var(--gray-050);
+  --cell-fixed-bar: var(--gray-300);
+  --cell-waiting-bg: var(--red-100);
+  --cell-waiting-bar: var(--red-500);
+  --cell-manual-ring: var(--gray-700);
+  --cell-line: var(--gray-100);
+  --cell-height: 38px;
+  --cell-height-compact: 26px;
+  --dim-out-of-month: 0.45;
+  --dim-reference: 0.6;
+  --color-weekday-sat: var(--blue-600);
+  --color-weekday-sun: var(--red-600);
 
   /* ── 타이포그래피 ── */
   --font-sans: "Pretendard Variable", Pretendard, "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;

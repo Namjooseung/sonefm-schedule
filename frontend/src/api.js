@@ -34,3 +34,9 @@ export const endProgram = (id, endDate) => call('end_program', id, endDate)
 export const resumeProgram = (id) => call('resume_program', id)
 export const deleteProgram = (id) => call('delete_program', id)
 export const createSpecial = (payload) => call('create_special', payload)
+
+// ── 편성표 ──
+export const getMonth = (year, month) => call('get_month', year, month)
+/** scope: 'first_week' | 'rest' | 'all' */
+export const generateMonth = (year, month, scope, overwriteManual = false) =>
+  call('generate_month', year, month, scope, overwriteManual)
