@@ -26,3 +26,6 @@ packaging/Output/
 
 # 아이콘 미리보기 (make_icon.py가 만듦)
 packaging/icon_preview.png
+
+# 시청자미디어재단 제출 자료 (동영상·신청서 등, 저장소에 넣지 않음)
+시청자미디어재단/

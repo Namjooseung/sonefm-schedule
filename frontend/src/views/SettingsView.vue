@@ -116,7 +116,7 @@ onActivated(loadAll)
           </select>
         </label>
         <label class="field">
-          <span>부정기 프로그램 "본방 입력 누락?" 경고 — 같은 회차 재방 연속 횟수</span>
+          <span>부정기 프로그램 "본방 입력 누락?" 경고 — 본방 없이 같은 회차 재방만 나간 주 수</span>
           <input v-model.number="rules.irregular_missing_warn_count" type="number" min="2" max="20" class="input num" />
         </label>
       </div>

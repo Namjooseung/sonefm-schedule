@@ -107,41 +107,61 @@ class Inferred:
     slots: list[InferredSlot] = field(default_factory=list)
 
 
-def infer_slots(cells: Iterable[tuple[date, int, str, str]], mondays: list[date]) -> dict[str, Inferred]:
-    """한 달치 칸 (날짜, 시, 프로그램 id, 본방/재방)으로 프로그램별 편성 자리와 주기를 추정한다.
+def infer_cycle(on_dates: Iterable[date]) -> tuple[str, date | None]:
+    """본방 날짜들의 간격으로 주기 판정. (주기, 격주 기준일)
 
-    - 같은 요일·시각에 두 주 이상 나온 자리만 편성 자리로 본다.
-    - 그 자리에 본방이 한 번이라도 있으면 본방 자리, 아니면 재방 자리.
-    - 주기는 본방이 가장 많은 자리로 판정: 매주 본방이면 매주, 2주 간격이면 격주(기준일=첫 본방),
-      그 밖에 본방이 있으면 부정기. 본방 자리가 없으면 매주(재방만 나가는 프로그램).
+    - 본방이 한 주에 여러 번(간격 7일 미만이 가장 많음) → 매주 (예: 회차 없는 음악 프로그램)
+    - 7일 간격이 절반 이상 → 매주,  14일 간격이 절반 이상 → 격주(기준일 = 마지막 본방)
+    - 그 밖, 또는 본방이 1번뿐 → 부정기.  본방이 없으면 매주(재방만 나가는 프로그램)
     """
+    ons = sorted(set(on_dates))
+    if not ons:
+        return "weekly", None
+    if len(ons) < 2:
+        return "irregular", None
+    gaps = Counter((b - a).days for a, b in zip(ons, ons[1:]))
+    mode, n = gaps.most_common(1)[0]
+    share = n / sum(gaps.values())
+    if mode < 7:
+        return "weekly", None
+    if mode == 7 and share >= 0.5:
+        return "weekly", None
+    if mode == 14 and share >= 0.5:
+        return "biweekly", ons[-1]
+    return "irregular", None
+
+
+def infer_slots(cells: Iterable[tuple[date, int, str, str]], mondays: list[date],
+                history: Iterable[tuple[date, int, str, str]] | None = None) -> dict[str, Inferred]:
+    """프로그램별 편성 자리와 주기 추정.
+
+    - 편성 자리: mondays 주들(보통 마지막 4주)에서 같은 요일·시각에 두 주 이상 나온 자리.
+    - 자리 역할: history(가져온 전체 기간)에 그 자리 본방이 한 번이라도 있으면 본방 자리, 아니면 재방 자리.
+      (휴방 기간처럼 마지막 몇 주에 재방만 있어도 본방 자리를 잃지 않게)
+    - 주기: history 전체의 본방 간격으로 infer_cycle.
+    cells·history 항목: (날짜, 시, 프로그램 id, 본방/재방). history가 없으면 cells를 쓴다.
+    """
+    cells = list(cells)
+    history = list(history) if history is not None else cells
     week_set = set(mondays)
-    by_pos: dict[str, dict[tuple[int, int], list[tuple[date, str]]]] = defaultdict(lambda: defaultdict(list))
-    for d, h, pid, kind in cells:
-        if d - timedelta(days=d.weekday()) in week_set:
-            by_pos[pid][(d.weekday(), h)].append((d, kind))
+    by_pos: dict[str, dict[tuple[int, int], set[date]]] = defaultdict(lambda: defaultdict(set))
+    for d, h, pid, _kind in cells:
+        mon = d - timedelta(days=d.weekday())
+        if mon in week_set:
+            by_pos[pid][(d.weekday(), h)].add(mon)
+    on_pos: dict[str, set[tuple[int, int]]] = defaultdict(set)
+    on_dates: dict[str, list[date]] = defaultdict(list)
+    for d, h, pid, kind in history:
+        if kind == "본방":
+            on_pos[pid].add((d.weekday(), h))
+            on_dates[pid].append(d)
 
     out: dict[str, Inferred] = {}
     for pid, positions in by_pos.items():
-        result = Inferred()
-        main: tuple[int, list[date], int] | None = None    # (본방 수, 본방 날짜들, 나온 주 수)
-        for (wd, h), seen in sorted(positions.items()):
-            weeks = {d - timedelta(days=d.weekday()) for d, _ in seen}
-            if len(weeks) < 2:
-                continue
-            ons = sorted(d for d, k in seen if k == "본방")
-            result.slots.append(InferredSlot(wd, h, "본방" if ons else "재방"))
-            if ons and (main is None or len(ons) > main[0]):
-                main = (len(ons), ons, len(weeks))
-        if main:
-            n_on, ons, n_weeks = main
-            gaps = Counter((b - a).days for a, b in zip(ons, ons[1:]))
-            if n_on == n_weeks:
-                result.cycle_type = "weekly"
-            elif n_on >= 2 and set(gaps) == {14}:
-                result.cycle_type, result.anchor = "biweekly", ons[0]
-            else:
-                result.cycle_type = "irregular"
-        if result.slots:
-            out[pid] = result
+        slots = [InferredSlot(wd, h, "본방" if (wd, h) in on_pos[pid] else "재방")
+                 for (wd, h), weeks in sorted(positions.items()) if len(weeks) >= 2]
+        if not slots:
+            continue
+        cycle, anchor = infer_cycle(on_dates[pid])
+        out[pid] = Inferred(cycle_type=cycle, anchor=anchor, slots=slots)
     return out

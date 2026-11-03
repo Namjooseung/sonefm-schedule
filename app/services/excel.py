@@ -275,7 +275,7 @@ def run_import(conn: sqlite3.Connection, path: str, titles: list[str], mapping: 
         schedule_repo.touch_month_generated(conn, f"{y:04d}-{m:02d}")
 
     # 새 프로그램: 마지막 달 기준 편성 자리 추정
-    inferred, ended = _infer_new(conn, created, resolved, cells)
+    inferred, ended = _infer_new(conn, created, resolved, cells, kinds)
     # 회차 맞추기
     _align_episodes(conn, excel_ep)
     diffs = _diff_episodes(conn, excel_ep)
@@ -294,19 +294,19 @@ def run_import(conn: sqlite3.Connection, path: str, titles: list[str], mapping: 
 INFER_WEEKS = 4   # 편성 자리 추정에 쓰는 마지막 주 수
 
 
-def _infer_new(conn, created: list[str], resolved: dict[str, str], cells) -> tuple[int, int]:
-    """새로 등록한 프로그램의 편성 자리·주기 추정 (데이터가 있는 마지막 4주 기준).
+def _infer_new(conn, created: list[str], resolved: dict[str, str], cells, kinds: dict[Key, str]) -> tuple[int, int]:
+    """새로 등록한 프로그램의 편성 자리(마지막 4주)와 주기(가져온 전체 기간의 본방 간격) 추정.
     그 4주에 한 번도 안 나온 프로그램은 마지막 방송일로 종영 처리한다."""
     if not created:
         return 0, 0
     filled_weeks = sorted({d - timedelta(days=d.weekday()) for (d, _h), (p, _t, _c) in cells.items() if p})
     mondays = filled_weeks[-INFER_WEEKS:]
-    rows = [(d, h, resolved[p.name], p.kind) for (d, h), (p, _t, _c) in cells.items()
+    rows = [(d, h, resolved[p.name], kinds.get((d, h), p.kind)) for (d, h), (p, _t, _c) in cells.items()
             if p and resolved.get(p.name) in created]
     last_seen: dict[str, date] = {}
     for d, _h, pid, _k in rows:
         last_seen[pid] = max(last_seen.get(pid, d), d)
-    guess = infer_slots(rows, mondays)
+    guess = infer_slots(rows, mondays, history=rows)   # 자리는 마지막 4주, 주기·본방 자리는 가져온 전체 기간
     inferred = ended = 0
     for pid in created:
         prog = programs_repo.get_program(conn, pid)

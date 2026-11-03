@@ -95,12 +95,21 @@ def test_부정기_본방_전환_후_재방이_새_회차를_가리킴():
     assert eps[("2026-11-27", 15)] == 5
 
 
-def test_부정기_같은_회차_재방이_이어지면_누락_의심():
+def test_부정기_같은_회차_재방만_나간_주가_이어지면_누락_의심():
+    # 주 1회 재방: 4주째 칸부터 표시
     cells = [cell("2026-11-06", 15, "p")] + [cell(d, 15, "p", "재방") for d in
                                              ("2026-11-13", "2026-11-20", "2026-11-27", "2026-12-04", "2026-12-11")]
     infos = compute_episodes(cells, 7)
     flagged = rerun_streak_warnings(sorted(cells, key=lambda c: c.key), infos, threshold=4)
     assert flagged == [(D("2026-12-04"), 15), (D("2026-12-11"), 15)]
+
+
+def test_재방_자리가_여러개여도_주_단위로_셈():
+    # 한 주에 재방 3번 × 2주 = 6칸이지만 2주뿐 → 경고 없음
+    days = ("2026-11-09", "2026-11-11", "2026-11-13", "2026-11-16", "2026-11-18", "2026-11-20")
+    cells = [cell("2026-11-06", 15, "p")] + [cell(d, 15, "p", "재방") for d in days]
+    infos = compute_episodes(cells, 7)
+    assert rerun_streak_warnings(sorted(cells, key=lambda c: c.key), infos, threshold=4) == []
 
 
 def test_수동지정_재방은_연속_계산에서_제외():

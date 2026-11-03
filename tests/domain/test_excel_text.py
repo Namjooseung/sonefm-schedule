@@ -96,7 +96,7 @@ def test_매주_본방_자리():
 
 def test_본방_재방_번갈아면_격주():
     r = infer_slots(_cells(NOV, 1, 10, ["본방", "재방", "본방", "재방", "본방"]), NOV)
-    assert r["p"].cycle_type == "biweekly" and r["p"].anchor == D("2026-11-03")
+    assert r["p"].cycle_type == "biweekly" and r["p"].anchor == D("2026-12-01")   # 마지막 본방
     assert [(s.weekday, s.hour, s.role) for s in r["p"].slots] == [(1, 10, "본방")]
 
 
@@ -114,3 +114,25 @@ def test_재방만_나오면_매주_재방_자리():
 def test_본방이_드문드문이면_부정기():
     r = infer_slots(_cells(NOV, 2, 11, ["재방", "재방", "본방", "재방", "재방"]), NOV)
     assert r["p"].cycle_type == "irregular" and r["p"].slots[0].role == "본방"
+
+
+def test_주기는_전체_기간_본방_간격으로():
+    from app.domain.excel_text import infer_cycle
+    from datetime import timedelta
+    weekly = [D("2026-03-03") + timedelta(weeks=i) for i in range(20)]
+    assert infer_cycle(weekly) == ("weekly", None)
+    bi = [D("2026-03-03") + timedelta(weeks=2 * i) for i in range(8)] + [D("2026-08-04")]   # 한 번 어긋나도
+    cyc, anchor = infer_cycle(bi)
+    assert cyc == "biweekly" and anchor == D("2026-08-04")
+    assert infer_cycle([D("2026-03-03"), D("2026-03-31"), D("2026-05-12")])[0] == "irregular"
+    assert infer_cycle([D("2026-08-04")])[0] == "irregular"
+    daily = [D("2026-03-02") + timedelta(days=i) for i in range(30)]          # 회차 없는 음악 프로그램
+    assert infer_cycle(daily)[0] == "weekly"
+    assert infer_cycle([]) == ("weekly", None)
+
+
+def test_마지막_몇주가_휴방이어도_본방_자리_유지():
+    history = _cells(NOV, 0, 9, ["본방", "본방", "재방", "재방", "재방"])
+    last = [x for x in history if x[0] >= D("2026-11-16")]
+    r = infer_slots(last, NOV[2:], history=history)
+    assert r["p"].slots[0].role == "본방"

@@ -123,3 +123,22 @@ def test_표기만_다른_이름은_같은_프로그램으로_묶기(conn):
     assert len(p) == 1
     detail = program_svc.get_program(conn, p[0]["id"])["program"]
     assert {"[OBS7 오늘의 기후", "[OBS] 오늘의 기후 119화"} <= set(detail["aliases"])
+
+
+def test_괄호_재_생략된_격주는_격주로_추정(conn, tmp_path):
+    """본방 자리에 같은 회차가 (재) 없이 다시 나오면 재방으로 읽고, 편성 자리 추정도 그 값으로 한다."""
+    from datetime import date, timedelta
+    from app.io_excel.writer import MonthSheet, WeekBlock, write_months
+    mondays = [date(2026, 8, 3) + timedelta(weeks=i) for i in range(4)]
+    blocks = []
+    for i, mon in enumerate(mondays):
+        wk = WeekBlock(label=f"8-{32 + i}", days=[(mon + timedelta(days=k)).day for k in range(7)])
+        ep = 72 + i // 2                       # 72, 72, 73, 73 → 격주 본방, 쉬는 주는 (재) 없이 같은 회차
+        wk.rows[10] = [(f"수원은 지금_{ep}화" if k == 1 else "", False) for k in range(7)]
+        blocks.append(wk)
+    path = tmp_path / "biweekly.xlsx"
+    write_months([MonthSheet("2608", date(2026, 8, 1), blocks)], path)
+    r = svc.run_import(conn, str(path), ["2608"], {"수원은 지금": {"action": "new"}})
+    assert r["ok"] and r["read_as_rerun"] == 2
+    p = program_svc.get_program(conn, program_svc.list_programs(conn, "수원은 지금", True)[0]["id"])["program"]
+    assert p["cycle_type"] == "biweekly" and p["cycle_anchor_date"] == "2026-08-18"   # 마지막 본방 (8/4와 같은 격주 박자)

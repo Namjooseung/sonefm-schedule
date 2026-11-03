@@ -7,13 +7,13 @@
 - 앱 안에 아직 본방이 없을 때의 재방:
   - 시작 회차 N > 1 이면 앱 이전에 N-1화까지 나간 것으로 보고 N-1화.
   - 시작 회차 1(신규)이면 회차 없음 → '본방 대기'.
-- 부정기 프로그램: 같은 회차 재방이 설정 횟수 이상 이어지면 '본방 입력 누락?' 경고.
+- 부정기 프로그램: 본방 없이 같은 회차 재방만 나간 주가 설정한 주 수 이상 이어지면 '본방 입력 누락?' 경고.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from app.domain.models import Cell
 
@@ -49,22 +49,22 @@ def compute_episodes(cells: Iterable[Cell], start_episode: int) -> list[EpisodeI
 def rerun_streak_warnings(
     ordered_cells: list[Cell], infos: list[EpisodeInfo], threshold: int
 ) -> list[tuple[date, int]]:
-    """같은 회차 자동 재방이 threshold번째 이어진 칸부터 표시한다.
+    """본방 없이 같은 회차 재방만 나간 주가 threshold주째 이어진 칸부터 표시한다 ('본방 입력 누락?').
 
+    재방 자리가 여러 개인 프로그램도 같은 기준이 되도록 칸 수가 아니라 주(월~일) 수로 센다.
     본방이 나오거나 회차를 수동 지정한 재방이 나오면 다시 센다.
     """
     flagged: list[tuple[date, int]] = []
-    streak = 0
+    weeks: set[date] = set()
     current: int | None = None
     for c, info in zip(ordered_cells, infos):
         if c.kind == "본방" or c.rerun_episode_override is not None:
-            streak, current = 0, None
+            weeks, current = set(), None
             continue
-        if info.episode == current:
-            streak += 1
-        else:
-            streak, current = 1, info.episode
-        if threshold > 0 and streak >= threshold:
+        if info.episode != current:
+            weeks, current = set(), info.episode
+        weeks.add(c.date - timedelta(days=c.date.weekday()))
+        if threshold > 0 and len(weeks) >= threshold:
             flagged.append(c.key)
     return flagged
 
