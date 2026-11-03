@@ -74,7 +74,7 @@ def _slot(conn: sqlite3.Connection, slot_id: str | None):
 
 def _run_edit(conn: sqlite3.Connection, d: date, hour: int, action: str,
               fn: Callable[[], str | Result], last: date | None = None,
-              program_ids: tuple[str, ...] = ()) -> Result:
+              program_ids: tuple[str, ...] = (), affects_episodes: bool = True) -> Result:
     """마감 확인 → 스냅숏 → 실행 → 변경 기록. fn은 변경 기록 메모(str)나 실패 결과를 돌려준다."""
     if _locked(conn, d):
         return _fail("마감된 달의 칸은 고칠 수 없습니다. 잠금을 먼저 풀어 주세요.")
@@ -84,8 +84,27 @@ def _run_edit(conn: sqlite3.Connection, d: date, hour: int, action: str,
     if isinstance(out, dict):
         return out
     after_cell = schedule_repo.get_cell_row(conn, d, hour)
-    change_log_repo.add(conn, "cell", f"{d.isoformat()}|{hour}", action, before_cell, after_cell, out)
-    return {"ok": True, "message": out, "undo": {"label": out, "snapshot": snap}}
+    note = out
+    if schedule_repo.month_status_of(conn, _ym_of(d)) == "확정":
+        note += " [확정 후 변경]"
+    change_log_repo.add(conn, "cell", f"{d.isoformat()}|{hour}", action, before_cell, after_cell, note)
+    return {"ok": True, "message": out, "warnings": _closed_after_warning(conn, d, program_ids, before_cell, after_cell)
+            if affects_episodes else [],
+            "undo": {"label": out, "snapshot": snap}}
+
+
+def _closed_after_warning(conn: sqlite3.Connection, d: date, program_ids: tuple[str, ...],
+                          before: dict | None, after: dict | None) -> list[str]:
+    """이 칸보다 뒤의 마감 달에 같은 프로그램 칸이 있으면 그 달 회차가 바뀔 수 있다고 경고."""
+    touched = sorted({p for p in (*program_ids, before and before["program_id"], after and after["program_id"]) if p})
+    closed = schedule_repo.closed_months(conn)
+    here = _ym_of(d)
+    months = sorted({_ym_of(date.fromisoformat(x)) for x in schedule_repo.months_using(conn, d, touched)})
+    later = [ym for ym in months if ym > here and ym in closed]
+    if not later:
+        return []
+    names = ", ".join(f"{int(ym[5:])}월" for ym in later)
+    return [f"마감된 {names}의 회차가 바뀔 수 있습니다. 제출한 보고서와 다르지 않은지 확인해 주세요."]
 
 
 def _regenerate_from(conn: sqlite3.Connection, d: date) -> int:
@@ -346,7 +365,7 @@ def set_override(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, episode: A
     def fn() -> str:
         schedule_repo.update_cell(conn, d, hour, rerun_episode_override=ep, source="manual")
         return f"{_label(d, hour)} {name} 재방 회차 " + (f"{ep}화로 지정" if ep else "자동 계산으로")
-    return _run_edit(conn, d, hour, "재방 회차 지정", fn)
+    return _run_edit(conn, d, hour, "재방 회차 지정", fn, affects_episodes=False)
 
 
 def set_actual(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, note: str | None) -> Result:
@@ -362,7 +381,7 @@ def set_actual(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, note: str | 
     def fn() -> str:
         schedule_repo.update_cell(conn, d, hour, actual_change_note=text)
         return f"{_label(d, hour)} 실제 변경 " + (f"기록: {text}" if text else "기록 지움")
-    return _run_edit(conn, d, hour, "실제 변경", fn)
+    return _run_edit(conn, d, hour, "실제 변경", fn, affects_episodes=False)
 
 
 def set_prep(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, status: str) -> Result:
@@ -376,7 +395,7 @@ def set_prep(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, status: str) -
     def fn() -> str:
         schedule_repo.update_cell(conn, d, hour, prep_status=status)
         return f"{_label(d, hour)} 송출 파일 {status}"
-    return _run_edit(conn, d, hour, "준비 상태", fn)
+    return _run_edit(conn, d, hour, "준비 상태", fn, affects_episodes=False)
 
 
 def revert(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:

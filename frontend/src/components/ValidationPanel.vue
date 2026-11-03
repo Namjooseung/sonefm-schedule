@@ -4,7 +4,7 @@
 const props = defineProps({
   month: { type: Number, required: true },
   totals: { type: Object, required: true },
-  issues: { type: Array, default: () => [] },   // [{ title, detail, key? }]
+  issues: { type: Array, default: () => [] },   // [{ kind, level: error|warn, detail, key? }]
 })
 const emit = defineEmits(['jump'])
 
@@ -23,8 +23,8 @@ const fmt = (n) => n.toLocaleString('ko-KR')
     <h2>확인할 것 {{ issues.length }}건</h2>
     <ul v-if="issues.length" class="issues">
       <li v-for="(it, i) in issues" :key="i">
-        <button class="issue" @click="it.key && emit('jump', it.key)">
-          <span class="it">{{ it.title }}</span>
+        <button class="issue" :class="it.level" :disabled="!it.key" @click="it.key && emit('jump', it.key)">
+          <span class="it">{{ it.kind }}</span>
           <span class="id">{{ it.detail }}</span>
         </button>
       </li>
@@ -63,11 +63,14 @@ h2 { font-size: var(--text-075); font-weight: var(--font-weight-bold); margin-bo
   padding: var(--space-100) var(--space-150); border-radius: var(--radius-300);
   border: 1px solid var(--color-border-warning); background: var(--color-background-warning-100);
 }
+.issue.error { border-color: var(--color-border-danger); background: var(--color-background-danger-100); }
+.issue.error .it { color: var(--color-foreground-danger-200); }
+.issue:disabled { cursor: default; }
 .issue::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: var(--color-overlay); opacity: 0; transition: opacity var(--motion-fast);
 }
-.issue:hover::before { opacity: var(--overlay-hover-dense); }
+.issue:not(:disabled):hover::before { opacity: var(--overlay-hover-dense); }
 .it { font-weight: var(--font-weight-bold); font-size: var(--text-050); color: var(--color-foreground-warning-200); }
 .id { font-size: var(--text-050); line-height: var(--leading-050); color: var(--color-foreground-normal-100); }
 .legend { display: grid; gap: var(--space-075); font-size: var(--text-050); color: var(--color-foreground-normal-100); }

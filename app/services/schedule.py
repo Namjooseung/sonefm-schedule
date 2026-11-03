@@ -9,9 +9,11 @@ from app.domain.episodes import compute_episodes, rerun_streak_warnings
 from app.domain.generate import build_rule_cells, plan_generation
 from app.domain.holidays_kr import holidays_between
 from app.domain.models import HOURS, Cell
+from app.domain.validate import validate_month
 from app.domain.weeks import (
     iso_week,
     month_dates,
+    month_of_week,
     reference_week,
     week_dates,
     week_index_in_month,
@@ -111,11 +113,14 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
                  and date.fromisoformat(k.split("|")[0]).year == year)
     first_week_keys = {f"{d.isoformat()}|{h}" for d in week_dates(weeks[0]) for h in HOURS}
     plan = schedule_repo.get_month_plan(conn, _ym(year, month))
+    issues = _validate(conn, cal_days, episodes, missing, display)
 
     return {
         "ok": True,
         "year": year, "month": month,
         "status": plan["status"] if plan else STATUS_NONE,
+        "plan": {k: plan[k] for k in ("confirmed_at", "closed_at", "unlock_reason")} if plan else None,
+        "issues": issues,
         "year_statuses": schedule_repo.month_statuses(conn, year),
         "reference_week": week_payload(ref, True),
         "weeks": [week_payload(w, False) for w in weeks],
@@ -129,6 +134,36 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
             "days": len(cal_days),
         },
     }
+
+
+def _validate(conn: sqlite3.Connection, cal_days: list[date], episodes: dict, missing: set,
+              display: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """달력 날짜 기준 검증. 그 달 칸이 하나도 없으면(미작성) 목록을 비운다."""
+    first, last = cal_days[0], cal_days[-1]
+    cells = {c.key: c for c in schedule_repo.cells_between(conn, first, last)}
+    if not cells:
+        return []
+    default = settings_repo.get(conn, "offweek_policy_default", "rerun")
+    rule, conflicts = build_rule_cells(cal_days, schedule_repo.program_rules(conn),
+                                       schedule_repo.slot_rules(conn), default)
+
+    def name(pid: str) -> str:
+        return display.get(pid, {}).get("name", "?")
+
+    orphans = [(d, h, name(pid)) for pid, d, h in schedule_repo.cancellations_between(conn, first, last)
+               if rule.get((d, h)) is None or rule[(d, h)].program_id != pid]
+    found = validate_month(cal_days, list(HOURS), cells, episodes, missing, orphans,
+                           [(c.date, c.hour, tuple(name(p) for p in c.program_ids)) for c in conflicts])
+    month = cal_days[0].month
+
+    def detail(i: Any) -> str:
+        # 11/1처럼 다른 달 소속 주에 있는 날짜는 그 달 화면에서 고친다
+        if i.key and month_of_week(i.key[0])[1] != month:
+            return f"{i.detail} ({month_of_week(i.key[0])[1]}월 화면에서 고칩니다)"
+        return i.detail
+
+    return [{"kind": i.kind, "level": i.level, "detail": detail(i),
+             "key": f"{i.key[0].isoformat()}|{i.key[1]}" if i.key else None} for i in found]
 
 
 # ── 월 생성 ───────────────────────────────────────

@@ -237,3 +237,38 @@ def restore(conn: sqlite3.Connection, snap: dict[str, Any]) -> None:
                 tuple(s.values()))
     _insert_rows(conn, "cancellations", snap["cancellations"])
     _insert_rows(conn, "schedule_cells", snap["cells"])
+
+
+# ── 월 상태·검증 (P5) ─────────────────────────────
+
+def set_month_status(conn: sqlite3.Connection, year_month: str, status: str,
+                     stamp_field: str | None = None, unlock_reason: str | None = None) -> None:
+    """월 상태 바꾸기. 행이 없으면 만든다. stamp_field: confirmed_at | closed_at."""
+    if stamp_field not in (None, "confirmed_at", "closed_at"):
+        raise ValueError(stamp_field)
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO month_plans (id, year_month, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+        " ON CONFLICT(year_month) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at",
+        (new_id(), year_month, status, ts, ts))
+    if stamp_field:
+        conn.execute(f"UPDATE month_plans SET {stamp_field} = ? WHERE year_month = ?", (ts, year_month))
+    if unlock_reason is not None:
+        conn.execute("UPDATE month_plans SET unlock_reason = ? WHERE year_month = ?", (unlock_reason, year_month))
+
+
+def cancellations_between(conn: sqlite3.Connection, first: date, last: date) -> list[tuple[str, date, int]]:
+    rows = conn.execute("SELECT program_id, original_date, original_hour FROM cancellations"
+                        " WHERE original_date BETWEEN ? AND ?", (first.isoformat(), last.isoformat()))
+    return [(r[0], _D(r[1]), r[2]) for r in rows]
+
+
+def months_using(conn: sqlite3.Connection, after: date, program_ids: list[str]) -> list[str]:
+    """after 이후에 이 프로그램들의 칸이 있는 날짜(YYYY-MM-DD) 목록. 마감 달 영향 경고에 쓴다."""
+    if not program_ids:
+        return []
+    marks = ",".join("?" for _ in program_ids)
+    rows = conn.execute(
+        f"SELECT DISTINCT date FROM schedule_cells WHERE date > ? AND program_id IN ({marks})",
+        (after.isoformat(), *program_ids))
+    return [r[0] for r in rows]

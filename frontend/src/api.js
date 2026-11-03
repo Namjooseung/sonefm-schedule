@@ -54,3 +54,6 @@ export const cellPrep = (date, hour, status) => call('cell_prep', date, hour, st
 export const cellRevert = (date, hour) => call('cell_revert', date, hour)
 export const undo = () => call('undo')
 export const listChangeLog = (limit = 200) => call('list_change_log', limit)
+
+// ── 월 상태 ── action: 'confirm' 확정 | 'reopen' 확정 취소 | 'close' 마감 | 'unlock' 잠금 해제(사유 필수)
+export const monthStatus = (year, month, action, reason = '') => call('month_status', year, month, action, reason)

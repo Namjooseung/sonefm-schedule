@@ -20,7 +20,7 @@ const errors = ref([])
 const notice = ref('')
 const busy = ref(false)
 const selected = ref('')
-const slotConflicts = ref([])
+const statusDialog = ref(null)     // { action, title, text, reason }
 const manualConfirm = ref(null)     // { scope, rows }
 const panelOpen = ref(true)
 const popup = ref(null)             // { key, rect }
@@ -64,11 +64,33 @@ const fmtKey = (k) => {
   return `${Number(m)}/${Number(day)} ${h}시`
 }
 
-const issues = computed(() => slotConflicts.value.map((c) => ({
-  title: '편성 자리 충돌',
-  detail: `${fmtKey(`${c.date}|${c.hour}`)} — ${c.programs.join(', ')} 중 하나만 들어갔습니다. 프로그램 화면에서 자리를 조정해 주세요.`,
-  key: `${c.date}|${c.hour}`,
-})))
+const issues = computed(() => data.value?.issues || [])
+
+// ── 월 상태 (작성 중 → 확정 → 마감) ──
+const STATUS_ACTIONS = {
+  confirm: { title: '편성 확정', button: '확정' },
+  reopen: { title: '확정 취소', button: '확정 취소' },
+  close: { title: '마감', button: '마감' },
+  unlock: { title: '마감 잠금 해제', button: '잠금 해제' },
+}
+function askStatus(action) {
+  const n = issues.value.length
+  const texts = {
+    confirm: n ? `확인할 것이 ${n}건 남아 있습니다. 그래도 확정할까요? 확정 후에도 편집할 수 있고, 바꾼 내용은 변경 기록에 '확정 후 변경'으로 남습니다.` : '이 달 편성을 확정할까요? 확정 후에도 편집할 수 있고, 바꾼 내용은 변경 기록에 표시됩니다.',
+    reopen: '확정을 취소하고 작성 중으로 돌립니다.',
+    close: '보고서를 제출한 달을 마감합니다. 마감하면 편집과 다시 생성이 잠깁니다. 풀려면 사유를 적어야 합니다.',
+    unlock: '마감을 풀면 편집할 수 있게 됩니다. 사유를 적어 주세요. 변경 기록에 남습니다.',
+  }
+  statusDialog.value = { action, title: STATUS_ACTIONS[action].title, text: texts[action], reason: '', error: '' }
+}
+async function applyStatus() {
+  const d = statusDialog.value
+  const r = await api.monthStatus(year.value, month.value, d.action, d.reason)
+  if (!r.ok) { d.error = r.errors[0]; return }
+  statusDialog.value = null
+  await load()
+  flash(r.message)
+}
 
 // 그 달 소속 주에 칸이 하나도 없으면 안내 문구를 보여준다
 const monthEmpty = computed(() => data.value && !Object.keys(data.value.cells).some((k) => k >= data.value.weeks[0].monday))
@@ -93,7 +115,6 @@ async function go(y, m) {
   selected.value = ''
   popup.value = null
   bandPick.value = null
-  slotConflicts.value = []
   notice.value = ''
   await load()
 }
@@ -105,10 +126,12 @@ function gotoPrevMonth() {
 }
 
 let noticeTimer = 0
-function flash(msg) {
+const noticeWarn = ref(false)
+function flash(msg, warn = false) {
   clearTimeout(noticeTimer)
   notice.value = msg
-  noticeTimer = setTimeout(() => { notice.value = '' }, 4000)
+  noticeWarn.value = warn
+  noticeTimer = setTimeout(() => { notice.value = '' }, warn ? 9000 : 4000)
 }
 
 async function generate(scope, overwrite = false) {
@@ -117,7 +140,7 @@ async function generate(scope, overwrite = false) {
   busy.value = false
   if (!r.ok) { errors.value = r.errors; return }
   errors.value = []
-  slotConflicts.value = r.slot_conflicts
+  canUndo.value = !!r.can_undo
   await load()
   if (r.manual_conflicts.length && !r.overwritten) {
     manualConfirm.value = { scope, rows: r.manual_conflicts }
@@ -133,6 +156,11 @@ async function overwriteManual() {
 
 async function jump(key) {
   const day = key.split('|')[0]
+  if (data.value.reference_week.days.some((d) => d.date === day)) {
+    // 다른 달 소속 주(참고 줄)의 칸은 그 달 화면으로 가서 보여준다
+    const [y, m] = data.value.reference_week.monday.split('-').map(Number)
+    await go(y, m)
+  }
   const week = data.value.weeks.find((w) => w.days.some((d) => d.date === day))
   if (week && folded.value[week.monday]) toggleWeek(week.monday)
   selected.value = key
@@ -148,10 +176,11 @@ function openCell(key, rect) {
   popup.value = { key, rect }
 }
 function closePopup() { popup.value = null }
-async function onCellChanged(message, undoable) {
+async function onCellChanged(message, undoable, warnings = []) {
   canUndo.value = !!undoable
   await load()
-  if (message) flash(message)
+  if (warnings.length) flash(`${message} — ${warnings.join(' ')}`, true)
+  else if (message) flash(message)
 }
 
 // 고정 편성 띠 → 날짜 고르기 → 그 칸 팝업
@@ -194,6 +223,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="row1">
           <h1>{{ year }}년 {{ month }}월 편성표</h1>
           <span v-if="data" class="badge" :class="statusBadge">{{ statusLabel }}</span>
+          <template v-if="data">
+            <button v-if="data.status === '작성중'" class="btn btn-outline btn-sm" @click="askStatus('confirm')">확정</button>
+            <template v-else-if="data.status === '확정'">
+              <button class="btn btn-sm" @click="askStatus('reopen')">확정 취소</button>
+              <button class="btn btn-outline btn-sm" @click="askStatus('close')">마감</button>
+            </template>
+            <button v-else-if="data.status === '마감'" class="btn btn-danger-outline btn-sm" @click="askStatus('unlock')">잠금 해제</button>
+          </template>
           <div class="spacer" />
           <div class="seg" role="group" aria-label="보기 밀도">
             <button :aria-pressed="density === 'normal'" @click="setDensity('normal')">기본</button>
@@ -226,6 +263,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div v-if="errors.length" class="callout callout-danger" role="alert">
           <ul><li v-for="e in errors" :key="e">{{ e }}</li></ul>
         </div>
+        <div v-if="data?.status === '마감'" class="callout callout-warning small">
+          마감된 달입니다. 편집과 다시 생성이 잠겨 있습니다. 고쳐야 하면 위쪽 <b>잠금 해제</b>를 눌러 사유를 적어 주세요.
+        </div>
         <p v-if="monthEmpty" class="hint">
           아직 비어 있는 달입니다. <b>첫 주 불러오기</b>로 첫 주를 채운 뒤 개편 사항을 고치고, <b>월단위 생성</b>으로 나머지 주를 채워 주세요.
         </p>
@@ -236,7 +276,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
     <ValidationPanel v-if="data && panelOpen" :month="month" :totals="data.totals" :issues="issues" @jump="jump" />
 
-    <div v-if="notice" class="toast" role="status">{{ notice }}</div>
+    <BaseDialog v-if="statusDialog" :title="statusDialog.title" @close="statusDialog = null">
+      <p>{{ statusDialog.text }}</p>
+      <textarea v-if="statusDialog.action === 'unlock'" v-model="statusDialog.reason" class="textarea" rows="3"
+                placeholder="예: 보고서 수정 제출로 11/10 편성 정정" />
+      <p v-if="statusDialog.error" class="callout callout-danger small">{{ statusDialog.error }}</p>
+      <template #footer>
+        <button class="btn" @click="statusDialog = null">취소</button>
+        <button class="btn" :class="statusDialog.action === 'unlock' || statusDialog.action === 'close' ? 'btn-danger' : 'btn-primary'"
+                @click="applyStatus">{{ STATUS_ACTIONS[statusDialog.action].button }}</button>
+      </template>
+    </BaseDialog>
+
+    <div v-if="notice" class="toast" :class="{ warn: noticeWarn }" role="status">{{ notice }}</div>
 
     <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" />
 
@@ -294,6 +346,7 @@ h1 { font-size: var(--text-400); line-height: var(--leading-400); font-weight: v
 }
 .band-pick p { margin: 0; font-weight: var(--font-weight-medium); }
 .band-pick .days { display: flex; gap: var(--space-050); flex-wrap: wrap; }
+.toast.warn { background: var(--color-background-warning-200); max-width: 560px; }
 .toast {
   position: fixed; left: 50%; bottom: var(--space-300); transform: translateX(-50%); z-index: 50;
   max-width: 400px; padding: var(--space-150) var(--space-200); border-radius: var(--radius-300);

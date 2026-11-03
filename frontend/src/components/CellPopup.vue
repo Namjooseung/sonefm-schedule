@@ -63,7 +63,7 @@ async function run(promise, keepOpen = false) {
   const r = await promise
   busy.value = false
   if (!r.ok) { errors.value = r.errors; return }
-  emit('changed', r.message, r.can_undo)
+  emit('changed', r.message, r.can_undo, r.warnings || [])
   if (keepOpen) { reset(); await load() } else emit('close')
 }
 

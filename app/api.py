@@ -16,7 +16,7 @@ from app.db.connection import open_db
 from app.domain import programs as program_rules
 from app.repository import meta_repo
 from app.repository import change_log_repo
-from app.services import cell_edit
+from app.services import cell_edit, month_status
 from app.services import programs as program_service
 from app.services import schedule as schedule_service
 
@@ -140,3 +140,8 @@ class Api:
     def list_change_log(self, limit: int = 200) -> dict[str, Any]:
         return self._run("list_change_log", lambda c: {
             "ok": True, "items": change_log_repo.recent(c, max(1, min(int(limit), 1000)))})
+
+    # ── 월 상태 ───────────────────────────────────
+    def month_status(self, year: int, month: int, action: str, reason: str = "") -> dict[str, Any]:
+        """action: confirm(확정) | reopen(확정 취소) | close(마감) | unlock(잠금 해제, 사유 필수)"""
+        return self._run("month_status", lambda c: month_status.change(c, year, month, action, reason))

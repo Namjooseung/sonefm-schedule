@@ -15,7 +15,7 @@ const emit = defineEmits(['goto-month', 'select', 'toggle', 'band'])
   <div class="month">
     <WeekRow
       :week="data.reference_week" :cells="data.cells" :hours="data.hours" :today="today"
-      :folded="!!folded[data.reference_week.monday]"
+      :selected="selected" :folded="!!folded[data.reference_week.monday]"
       @goto-month="(m) => emit('goto-month', m)" @toggle="emit('toggle', data.reference_week.monday)"
     />
     <WeekRow
