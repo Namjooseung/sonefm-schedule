@@ -23,6 +23,19 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 
 @contextmanager
+def savepoint(conn: sqlite3.Connection, name: str = "sp") -> Iterator[None]:
+    """블록 안의 쓰기만 묶는다. 오류가 나면 블록 안의 변경만 되돌리고 오류를 다시 던진다."""
+    conn.execute(f"SAVEPOINT {name}")
+    try:
+        yield
+    except BaseException:
+        conn.execute(f"ROLLBACK TO {name}")
+        conn.execute(f"RELEASE {name}")
+        raise
+    conn.execute(f"RELEASE {name}")
+
+
+@contextmanager
 def open_db(db_path: str | Path) -> Iterator[sqlite3.Connection]:
     """with 블록이 정상 종료되면 커밋, 오류면 롤백하고 항상 닫는다."""
     conn = connect(db_path)

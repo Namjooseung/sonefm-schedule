@@ -270,12 +270,15 @@ sonefm-scheduler/
       migrations/0001_init.sql
     repository/             -- DB 접근 전담
     domain/                 -- 회차, 주기 판정, 월 생성, 검증, 비율, 집계
+    services/               -- 요청 흐름(검증→저장→변경 기록). domain과 repository를 엮음 (P1 추가)
     io_excel/               -- 엑셀 가져오기/내보내기
     backup.py
   frontend/                 -- Vue 3 + Vite
     src/
       views/ScheduleView.vue, ProgramsView.vue, SettingsView.vue
-      components/MonthGrid.vue, WeekRow.vue, CellPopup.vue, ValidationPanel.vue
+      components/MonthGrid.vue, WeekRow.vue, CellPopup.vue, ValidationPanel.vue,
+                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue
+      styles/tokens.css, base.css
       api.js                -- window.pywebview.api 래퍼
   tests/
   packaging/

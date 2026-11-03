@@ -45,6 +45,8 @@ pytest -q
 | `app/db/` | 연결, 마이그레이션 (`migrations/NNNN_*.sql`, `PRAGMA user_version`) |
 | `app/repository/` | SQL은 여기서만 |
 | `app/domain/` | 비즈니스 규칙 (순수 함수, pytest) |
+| `app/services/` | 요청 흐름: 검증 → 저장 → 변경 기록. 결과는 `{ok, errors}` 형식 |
+| `frontend/src/styles/tokens.css` | DESIGN.md 디자인 토큰. 컴포넌트는 이 변수만 쓴다 |
 | `frontend/` | Vue 3 + Vite. `vite-plugin-singlefile`로 HTML 한 파일로 빌드해 `file://`로 로드 (로컬 서버 없음) |
 
 ## 데이터 위치

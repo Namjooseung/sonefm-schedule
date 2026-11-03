@@ -1,0 +1,112 @@
+/* 공통 요소 스타일. 값은 tokens.css 변수만 쓴다. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--color-background-canvas-200);
+  color: var(--color-foreground-normal-200);
+  font-family: var(--font-sans);
+  font-size: var(--text-075);
+  line-height: var(--leading-075);
+  letter-spacing: var(--tracking-tight);
+  font-feature-settings: "tnum";
+}
+h1, h2, h3 { margin: 0; letter-spacing: var(--tracking-heading); }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: 2px solid var(--color-foreground-normal-200); outline-offset: 2px; }
+
+/* ── 버튼 ── */
+.btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-075);
+  height: var(--control-md); padding: 0 var(--space-150);
+  border: 0; border-radius: var(--radius-300);
+  font-size: var(--text-075); font-weight: var(--font-weight-medium); line-height: var(--leading-075);
+  white-space: nowrap; cursor: pointer;
+  background: var(--color-background-secondary-200);
+  color: var(--color-foreground-secondary-200);
+}
+.btn::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--color-overlay); opacity: 0; transition: opacity var(--motion-fast);
+}
+.btn:hover::before { opacity: var(--overlay-hover); }
+.btn:active::before { opacity: var(--overlay-press); }
+.btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.btn:disabled::before { opacity: 0; }
+.btn-sm { height: var(--control-sm); padding: 0 var(--space-100); gap: var(--space-050); }
+
+.btn-primary { background: var(--color-background-primary-200); color: var(--color-foreground-inverse); }
+.btn-outline {
+  background: var(--color-background-canvas-100); color: var(--color-foreground-primary-200);
+  box-shadow: inset 0 0 0 1px var(--color-border-primary);
+}
+.btn-danger-outline {
+  background: var(--color-background-canvas-100); color: var(--color-foreground-danger-200);
+  box-shadow: inset 0 0 0 1px var(--color-border-danger);
+}
+.btn-danger { background: var(--color-background-danger-200); color: var(--color-foreground-inverse); }
+.btn-ghost { background: transparent; color: var(--color-foreground-primary-100); }
+.btn-ghost-danger { background: transparent; color: var(--color-foreground-danger-100); }
+
+/* ── 입력 ── */
+.input, .select, .textarea {
+  height: var(--control-md); padding: 0 var(--space-150);
+  border: 0; border-radius: var(--radius-300);
+  background: var(--color-background-canvas-100);
+  color: var(--color-foreground-normal-200);
+  box-shadow: inset 0 0 0 1px var(--color-border-secondary);
+  transition: box-shadow var(--motion-fast);
+  min-width: 0;
+}
+.textarea { height: auto; padding: var(--space-075) var(--space-150); resize: vertical; width: 100%; }
+.input::placeholder, .textarea::placeholder { color: var(--color-foreground-hint-100); }
+.input:hover, .select:hover, .textarea:hover { box-shadow: inset 0 0 0 1px var(--color-border-hint); }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none; box-shadow: inset 0 0 0 1px var(--color-border-primary);
+}
+.input[readonly] { background: var(--color-background-readonly); }
+.input-sm, .select-sm { height: var(--control-sm); padding: 0 var(--space-100); font-size: var(--text-050); }
+.check { display: inline-flex; align-items: center; gap: var(--space-100); cursor: pointer; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--color-background-primary-200); }
+
+/* ── 배지 ── */
+.badge {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--space-075);
+  border-radius: var(--radius-300); font-size: var(--text-050); line-height: var(--leading-050);
+  font-weight: var(--font-weight-medium); white-space: nowrap;
+  background: var(--color-background-hint-100); color: var(--color-foreground-hint-200);
+}
+.badge-edu { background: var(--color-category-edu-bg); color: var(--color-category-edu-fg); }
+.badge-ent { background: var(--color-category-ent-bg); color: var(--color-category-ent-fg); }
+.badge-special { background: var(--color-special-bg); color: var(--color-special-fg); }
+.badge-danger { background: var(--color-background-danger-100); color: var(--color-foreground-danger-200); }
+.badge-success { background: var(--color-background-success-100); color: var(--color-foreground-success-200); }
+
+/* ── 카드 ── */
+.card {
+  background: var(--color-background-overlay-100);
+  border: 1px solid var(--color-border-normal);
+  border-radius: var(--radius-300);
+}
+
+/* ── 콜아웃 ── */
+.callout {
+  padding: var(--space-150) var(--space-200); border-radius: var(--radius-300);
+  font-weight: var(--font-weight-medium);
+}
+.callout-danger {
+  border: 1px solid var(--color-border-danger);
+  background: var(--color-background-danger-100); color: var(--color-foreground-danger-200);
+}
+.callout-success {
+  border: 1px solid var(--color-border-success);
+  background: var(--color-background-success-100); color: var(--color-foreground-success-200);
+}
+.callout-warning {
+  border: 1px solid var(--color-border-warning);
+  background: var(--color-background-warning-100); color: var(--color-foreground-warning-200);
+}
+.callout ul { margin: 0; padding-left: var(--space-250); }
+
+.muted { color: var(--color-foreground-hint-100); }
+.small { font-size: var(--text-050); line-height: var(--leading-050); }
