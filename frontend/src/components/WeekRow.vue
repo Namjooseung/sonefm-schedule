@@ -45,7 +45,8 @@ function episodeText(c) {
 
 function titleText(c, day, h) {
   if (!c) return `${day.month}/${day.day}(${day.weekday}) ${h}시 · 빈칸`
-  const parts = [`${day.month}/${day.day}(${day.weekday}) ${h}시`, c.name, c.kind]
+  const parts = [`${day.month}/${day.day}(${day.weekday}) ${h}시`, c.name,
+    c.kind === '재방' && !c.rerun_mark ? '재방(본방 자리)' : c.kind]
   const ep = episodeText(c)
   if (ep) parts.push(ep)
   if (c.missing_warn) parts.push('본방 입력 누락?')
@@ -121,7 +122,7 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
                 <path d="M12 4l9 16H3zM12 10v4M12 17v.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
               <span v-if="cellAt(d.date, h).missing_warn" class="warn">누락?</span>
-              <span v-if="cellAt(d.date, h).kind === '재방' && !cellAt(d.date, h).waiting" class="r">재</span>
+              <span v-if="cellAt(d.date, h).kind === '재방' && cellAt(d.date, h).rerun_mark && !cellAt(d.date, h).waiting" class="r">재</span>
               <span v-if="episodeText(cellAt(d.date, h))" class="e">{{ episodeText(cellAt(d.date, h)) }}</span>
             </template>
           </div>

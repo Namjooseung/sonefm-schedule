@@ -390,9 +390,10 @@ def _diff_episodes(conn: sqlite3.Connection, excel_ep: dict[Key, tuple[str, int 
 # ── 3. 내보내기 ───────────────────────────────────
 
 def _cell_texts(conn: sqlite3.Connection, first: date, last: date) -> dict[Key, tuple[str, bool, bool]]:
-    """(날짜, 시) → (엑셀 글자, 재방 여부, 고정 편성 그대로인지)."""
-    from app.services.schedule import _episode_map
+    """(날짜, 시) → (엑셀 글자, 재방 표시 여부, 고정 편성 그대로인지, 프로그램 id)."""
+    from app.services.schedule import _episode_map, rerun_mark_map
     episodes, _ = _episode_map(conn, last)
+    marks = rerun_mark_map(conn, first, last)
     display = schedule_repo.program_display(conn)
     fixed = set(settings_repo.get(conn, "fixed_program_ids", []))
     out = {}
@@ -401,9 +402,11 @@ def _cell_texts(conn: sqlite3.Connection, first: date, last: date) -> dict[Key, 
         p = display.get(r["program_id"], {"name": "?", "show_episode": True, "is_special": False})
         info = episodes.get((d, r["hour"]))
         show = p["show_episode"] and not p["is_special"] and r["program_id"] not in fixed
-        text = format_cell_text(p["name"], r["kind"], info.episode if info else None, show)
+        # 본방 자리에 나가는 재방은 (재)를 붙이지 않는다 (기존 엑셀과 같은 방식)
+        marked = r["kind"] == "재방" and marks.get((d, r["hour"]), True)
+        text = format_cell_text(p["name"], "재방" if marked else "본방", info.episode if info else None, show)
         is_band = r["program_id"] in fixed and r["source"] != "manual"
-        out[(d, r["hour"])] = (text, r["kind"] == "재방", is_band, r["program_id"])
+        out[(d, r["hour"])] = (text, marked, is_band, r["program_id"])
     return out
 
 
@@ -465,8 +468,8 @@ def compare(conn: sqlite3.Connection, path: str, titles: list[str], limit: int =
 
 
 def _diff_kind(excel_text: str, app_text: str) -> str:
-    """차이 분류: 재방 표시만 다름(엑셀에서 (재) 생략) / 회차만 다름 / 그 밖."""
-    if app_text == excel_text + "(재)":
+    """차이 분류: 재방 표시만 다름((재)가 한쪽에만) / 회차만 다름 / 그 밖."""
+    if app_text == excel_text + "(재)" or excel_text == app_text + "(재)":
         return "재방 표시만 다름"
     a, b = parse_cell_text(excel_text), parse_cell_text(app_text)
     if a and b and a.name == b.name:

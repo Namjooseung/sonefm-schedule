@@ -9,6 +9,7 @@ from app.domain.episodes import compute_episodes, rerun_streak_warnings
 from app.domain.generate import build_rule_cells, plan_generation
 from app.domain.holidays_kr import holidays_between
 from app.domain.models import HOURS, Cell
+from app.domain.rerun_mark import NEARBY_WEEKS, rerun_marks
 from app.domain.validate import validate_month
 from app.domain.weeks import (
     iso_week,
@@ -63,6 +64,13 @@ def _episode_map(conn: sqlite3.Connection, last: date) -> tuple[dict[tuple[date,
     return episodes, missing
 
 
+def rerun_mark_map(conn: sqlite3.Connection, first: date, last: date) -> dict[tuple[date, int], bool]:
+    """[first, last] 재방 칸의 표시 여부. 직전 본방을 찾도록 앞쪽 반년, 뒤쪽 몇 주를 더 읽는다."""
+    cells = schedule_repo.cells_between(conn, first - timedelta(weeks=26), last + timedelta(weeks=NEARBY_WEEKS))
+    roles = {s.id: s.role for s in schedule_repo.slot_rules(conn)}
+    return rerun_marks(cells, roles)
+
+
 # ── 월 화면 ───────────────────────────────────────
 
 def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
@@ -77,6 +85,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
     display = schedule_repo.program_display(conn)
     fixed_ids = set(settings_repo.get(conn, "fixed_program_ids", []))
     episodes, missing = _episode_map(conn, last)
+    marks = rerun_mark_map(conn, first, last)
     hol = holidays_between(first, last, schedule_repo.manual_holidays(conn, first, last))
 
     cells: dict[str, dict[str, Any]] = {}
@@ -90,6 +99,8 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
             "is_special": prog["is_special"], "is_fixed": r["program_id"] in fixed_ids,
             "show_episode": prog.get("show_episode", True), "imported": r["source"] == "import",
             "kind": r["kind"], "episode": info.episode if info else None,
+            # 재방 표시('재')를 붙일지 — 본방 자리에 나가는 재방은 표시 없음
+            "rerun_mark": marks.get((d, r["hour"]), False),
             "waiting": bool(info and info.waiting), "missing_warn": (d, r["hour"]) in missing,
             "manual": r["source"] == "manual", "exception_type": r["exception_type"],
             "prep_status": r["prep_status"], "actual_change_note": r["actual_change_note"],

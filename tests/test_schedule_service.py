@@ -131,3 +131,11 @@ def test_월_경계_참고줄에_10월_칸이_보임(conn):
     assert m["cells"]["2026-10-27|11"]["name"] == "마을살이 정류장"
     assert m["cells"]["2026-11-01|6"]["name"] == "굿모닝!"   # 11/1은 10월에서 생성됨
     assert date.fromisoformat("2026-11-01").weekday() == 6
+
+
+def test_본방_자리_재방은_재_표시_없음(conn):
+    _register(conn)
+    svc.generate(conn, 2026, 11, "all")
+    c = svc.get_month(conn, 2026, 11)["cells"]
+    assert c["2026-11-10|10"]["kind"] == "재방" and c["2026-11-10|10"]["rerun_mark"] is False   # 격주 쉬는 주
+    assert c["2026-11-07|18"]["kind"] == "재방" and c["2026-11-07|18"]["rerun_mark"] is True    # 재방 자리
