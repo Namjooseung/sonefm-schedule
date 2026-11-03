@@ -28,7 +28,7 @@ def test_매월_n째_주는_주의_소속_기준():
     assert not is_broadcast_week(p, D("2026-11-01"))
 
 
-def test_부정기와_단발은_자동_본방_없음():
+def test_비정기와_단발은_자동_본방_없음():
     assert not is_broadcast_week(prog("p", "irregular"), D("2026-11-02"))
     assert not is_broadcast_week(prog("p", "oneoff"), D("2026-11-02"))
 
@@ -51,6 +51,6 @@ def test_격주_쉬는_주는_정책대로():
     assert rule_kind(bi_empty, s, D("2026-11-12"), "rerun") is None  # 프로그램 개별 값이 우선
 
 
-def test_부정기는_본방_자리도_재방으로_깔림():
+def test_비정기는_본방_자리도_재방으로_깔림():
     irr = prog("p", "irregular")
     assert rule_kind(irr, slot("s", "p", 4, 15), D("2026-11-06"), "rerun") == "재방"

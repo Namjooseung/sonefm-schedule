@@ -392,7 +392,7 @@ def _diff_episodes(conn: sqlite3.Connection, excel_ep: dict[Key, tuple[str, int 
 def _cell_texts(conn: sqlite3.Connection, first: date, last: date) -> dict[Key, tuple[str, bool, bool]]:
     """(날짜, 시) → (엑셀 글자, 재방 표시 여부, 고정 편성 그대로인지, 프로그램 id)."""
     from app.services.schedule import _episode_map, rerun_mark_map
-    episodes, _ = _episode_map(conn, last)
+    episodes = _episode_map(conn, last)
     marks = rerun_mark_map(conn, first, last)
     display = schedule_repo.program_display(conn)
     fixed = set(settings_repo.get(conn, "fixed_program_ids", []))

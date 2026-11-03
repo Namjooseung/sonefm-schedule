@@ -17,7 +17,7 @@ def _db(tmp_path):
 def test_기본_설정값(tmp_path):
     s = settings_repo.get_all(_db(tmp_path))
     assert s["offweek_policy_default"] == "rerun"
-    assert s["irregular_missing_warn_count"] == 4
+    assert "irregular_missing_warn_count" not in s     # 0004에서 삭제
     assert len(s["fixed_program_ids"]) == 2
 
 
@@ -35,8 +35,8 @@ def test_고정편성_프로그램과_매일_자리(tmp_path):
 
 def test_설정값_쓰기(tmp_path):
     conn = _db(tmp_path)
-    settings_repo.set_value(conn, "irregular_missing_warn_count", 5)
+    settings_repo.set_value(conn, "offweek_policy_default", "empty")
     settings_repo.set_value(conn, "새키", {"a": 1})
-    assert settings_repo.get(conn, "irregular_missing_warn_count") == 5
+    assert settings_repo.get(conn, "offweek_policy_default") == "empty"
     assert settings_repo.get(conn, "새키") == {"a": 1}
     assert settings_repo.get(conn, "없는키", "기본") == "기본"

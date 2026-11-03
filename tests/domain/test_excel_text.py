@@ -111,7 +111,7 @@ def test_재방만_나오면_매주_재방_자리():
     assert r["p"].cycle_type == "weekly" and r["p"].slots[0].role == "재방"
 
 
-def test_본방이_드문드문이면_부정기():
+def test_본방이_드문드문이면_비정기():
     r = infer_slots(_cells(NOV, 2, 11, ["재방", "재방", "본방", "재방", "재방"]), NOV)
     assert r["p"].cycle_type == "irregular" and r["p"].slots[0].role == "본방"
 

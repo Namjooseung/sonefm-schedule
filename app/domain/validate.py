@@ -3,7 +3,6 @@
 - 빈칸: 매일 06~22시 17칸이 모두 채워졌는지 (날짜별로 묶음). 같은 칸 중복은 DB가 막는다(UNIQUE).
 - 총 방송분: 채워진 칸 × 60분 = 일수 × 17 × 60분 인지
 - 본방 대기: 첫 본방 전 재방
-- 본방 입력 누락?: 부정기 같은 회차 재방이 설정 횟수 이상
 - 고아 예외: 결방 기록의 원래 칸이 개편으로 사라짐
 - 편성 자리 충돌: 같은 칸에 같은 우선순위 자리가 둘 이상
 비율 미달 경고는 기준값 확정 전까지 보류 (PLAN P5).
@@ -39,7 +38,6 @@ def validate_month(
     hours: list[int],
     cells: dict[Key, Cell],
     episodes: dict[Key, EpisodeInfo],
-    missing: set[Key],
     orphans: Iterable[tuple[date, int, str]],
     conflicts: Iterable[tuple[date, int, tuple[str, ...]]],
 ) -> list[Issue]:
@@ -60,9 +58,6 @@ def validate_month(
         info = episodes.get(key)
         if info and info.waiting:
             issues.append(Issue("본방 대기", "error", f"{_day(key[0])} {key[1]:02d}시 — 재방할 본방이 아직 없습니다.", key))
-        if key in missing:
-            issues.append(Issue("본방 입력 누락?", "warn",
-                                f"{_day(key[0])} {key[1]:02d}시 — 같은 회차 재방이 계속 이어집니다. 본방을 빠뜨렸는지 확인해 주세요.", key))
 
     for d, h, name in orphans:
         if d in in_month:

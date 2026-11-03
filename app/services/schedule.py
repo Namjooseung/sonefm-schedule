@@ -5,7 +5,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Any
 
-from app.domain.episodes import compute_episodes, rerun_streak_warnings
+from app.domain.episodes import compute_episodes
 from app.domain.generate import build_rule_cells, plan_generation
 from app.domain.holidays_kr import holidays_between
 from app.domain.models import HOURS, Cell
@@ -43,15 +43,13 @@ def _valid_month(year: Any, month: Any) -> tuple[int, int] | None:
 
 # ── 회차·경고 계산 ────────────────────────────────
 
-def _episode_map(conn: sqlite3.Connection, last: date) -> tuple[dict[tuple[date, int], Any], set[tuple[date, int]]]:
-    """last까지 전체 이력으로 칸별 회차와 '본방 입력 누락?' 칸을 계산한다."""
+def _episode_map(conn: sqlite3.Connection, last: date) -> dict[tuple[date, int], Any]:
+    """last까지 전체 이력으로 칸별 회차를 계산한다."""
     programs = schedule_repo.program_rules(conn)
-    threshold = int(settings_repo.get(conn, "irregular_missing_warn_count", 4))
     groups: dict[str, list[Cell]] = {}
     for c in schedule_repo.cells_until(conn, last):
         groups.setdefault(c.program_id, []).append(c)
     episodes: dict[tuple[date, int], Any] = {}
-    missing: set[tuple[date, int]] = set()
     for pid, cells in groups.items():
         p = programs.get(pid)
         start = p.start_episode if p else 1
@@ -59,9 +57,7 @@ def _episode_map(conn: sqlite3.Connection, last: date) -> tuple[dict[tuple[date,
         infos = compute_episodes(ordered, start)
         for c, info in zip(ordered, infos):
             episodes[c.key] = info
-        if p and p.cycle_type == "irregular":
-            missing.update(rerun_streak_warnings(ordered, infos, threshold))
-    return episodes, missing
+    return episodes
 
 
 def rerun_mark_map(conn: sqlite3.Connection, first: date, last: date) -> dict[tuple[date, int], bool]:
@@ -84,7 +80,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
 
     display = schedule_repo.program_display(conn)
     fixed_ids = set(settings_repo.get(conn, "fixed_program_ids", []))
-    episodes, missing = _episode_map(conn, last)
+    episodes = _episode_map(conn, last)
     marks = rerun_mark_map(conn, first, last)
     hol = holidays_between(first, last, schedule_repo.manual_holidays(conn, first, last))
 
@@ -101,7 +97,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
             "kind": r["kind"], "episode": info.episode if info else None,
             # 재방 표시('재')를 붙일지 — 본방 자리에 나가는 재방은 표시 없음
             "rerun_mark": marks.get((d, r["hour"]), False),
-            "waiting": bool(info and info.waiting), "missing_warn": (d, r["hour"]) in missing,
+            "waiting": bool(info and info.waiting),
             "manual": r["source"] == "manual", "exception_type": r["exception_type"],
             "prep_status": r["prep_status"], "actual_change_note": r["actual_change_note"],
         }
@@ -125,7 +121,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
                  and date.fromisoformat(k.split("|")[0]).year == year)
     first_week_keys = {f"{d.isoformat()}|{h}" for d in week_dates(weeks[0]) for h in HOURS}
     plan = schedule_repo.get_month_plan(conn, _ym(year, month))
-    issues = _validate(conn, cal_days, episodes, missing, display)
+    issues = _validate(conn, cal_days, episodes, display)
 
     return {
         "ok": True,
@@ -148,7 +144,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
     }
 
 
-def _validate(conn: sqlite3.Connection, cal_days: list[date], episodes: dict, missing: set,
+def _validate(conn: sqlite3.Connection, cal_days: list[date], episodes: dict,
               display: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     """달력 날짜 기준 검증. 그 달 칸이 하나도 없으면(미작성) 목록을 비운다."""
     first, last = cal_days[0], cal_days[-1]
@@ -164,7 +160,7 @@ def _validate(conn: sqlite3.Connection, cal_days: list[date], episodes: dict, mi
 
     orphans = [(d, h, name(pid)) for pid, d, h in schedule_repo.cancellations_between(conn, first, last)
                if rule.get((d, h)) is None or rule[(d, h)].program_id != pid]
-    found = validate_month(cal_days, list(HOURS), cells, episodes, missing, orphans,
+    found = validate_month(cal_days, list(HOURS), cells, episodes, orphans,
                            [(c.date, c.hour, tuple(name(p) for p in c.program_ids)) for c in conflicts])
     month = cal_days[0].month
 

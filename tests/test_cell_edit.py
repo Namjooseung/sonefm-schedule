@@ -88,7 +88,7 @@ def test_특집_넣기와_재사용(api):
     assert api.cell_special("2026-11-21", 18, {"program_id": sp["id"]})["ok"]
 
 
-def test_부정기_본방으로_전환하면_이후_재방이_새_회차(api):
+def test_비정기_본방으로_전환하면_이후_재방이_새_회차(api):
     assert ep(api, "2026-11-13", 15) == 4
     r = api.cell_set_kind("2026-11-13", 15, "본방")
     assert r["ok"]

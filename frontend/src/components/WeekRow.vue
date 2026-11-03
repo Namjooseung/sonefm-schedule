@@ -49,7 +49,6 @@ function titleText(c, day, h) {
     c.kind === '재방' && !c.rerun_mark ? '재방(본방 자리)' : c.kind]
   const ep = episodeText(c)
   if (ep) parts.push(ep)
-  if (c.missing_warn) parts.push('본방 입력 누락?')
   if (c.exception_type) parts.push(c.exception_type)
   if (c.actual_change_note) parts.push(`실제 변경: ${c.actual_change_note}`)
   if (c.kind === '본방' && !c.is_fixed) parts.push(`송출 파일 ${c.prep_status}`)
@@ -121,7 +120,6 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
               <svg v-if="cellAt(d.date, h).actual_change_note" class="ico actual" viewBox="0 0 24 24" width="14" height="14" aria-label="실제 변경 있음">
                 <path d="M12 4l9 16H3zM12 10v4M12 17v.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <span v-if="cellAt(d.date, h).missing_warn" class="warn">누락?</span>
               <span v-if="cellAt(d.date, h).kind === '재방' && cellAt(d.date, h).rerun_mark && !cellAt(d.date, h).waiting" class="r">재</span>
               <span v-if="episodeText(cellAt(d.date, h))" class="e">{{ episodeText(cellAt(d.date, h)) }}</span>
             </template>
@@ -197,10 +195,6 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
 .c .r {
   flex: none; font-size: var(--text-025); line-height: 14px; padding: 0 3px; border-radius: var(--radius-100);
   box-shadow: inset 0 0 0 1px currentColor; font-weight: var(--font-weight-bold);
-}
-.c .warn {
-  flex: none; font-size: var(--text-025); line-height: 14px; padding: 0 var(--space-050); border-radius: var(--radius-100);
-  background: var(--color-background-warning-100); color: var(--color-foreground-warning-200); font-weight: var(--font-weight-bold);
 }
 .c .ico { flex: none; color: var(--color-foreground-normal-100); }
 .c .ico.actual { color: var(--color-foreground-warning-200); }

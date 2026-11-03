@@ -19,7 +19,7 @@ CYCLE_TYPES: dict[str, str] = {
     "biweekly": "격주",
     "multi_weekly": "주 n회",
     "monthly_nth": "매월 n째 주",
-    "irregular": "부정기",
+    "irregular": "비정기",
     "oneoff": "단발(특집)",
 }
 OFFWEEK_POLICIES: dict[str, str] = {"rerun": "재방으로 채움", "empty": "비움"}

@@ -51,7 +51,7 @@ function pushFixed() {
 function saveRules() {
   const r = rules.value
   act(api.settingsSave({ offweek_policy_default: r.offweek_policy_default,
-    irregular_missing_warn_count: r.irregular_missing_warn_count, fixed_program_ids: r.fixed_program_ids }))
+    fixed_program_ids: r.fixed_program_ids }))
 }
 
 // ── 임시공휴일 ──
@@ -114,10 +114,6 @@ onActivated(loadAll)
             <option value="rerun">재방으로 채움 (직전 회차)</option>
             <option value="empty">비움</option>
           </select>
-        </label>
-        <label class="field">
-          <span>부정기 프로그램 "본방 입력 누락?" 경고 — 본방 없이 같은 회차 재방만 나간 주 수</span>
-          <input v-model.number="rules.irregular_missing_warn_count" type="number" min="2" max="20" class="input num" />
         </label>
       </div>
       <div class="field">

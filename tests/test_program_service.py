@@ -1,4 +1,4 @@
-"""P1 완료 조건: 매주·격주·부정기 프로그램을 등록·수정·종영 처리할 수 있다."""
+"""P1 완료 조건: 매주·격주·비정기 프로그램을 등록·수정·종영 처리할 수 있다."""
 import pytest
 
 from app.config import migrations_dir
@@ -56,7 +56,7 @@ def test_격주_등록_기준일_없으면_실패(conn):
     assert r["program"]["cycle_anchor_date"] == "2026-11-05"
 
 
-def test_부정기_등록(conn):
+def test_비정기_등록(conn):
     r = svc.save_program(conn, _weekly(name="[10기] 그 삶이다", aliases=[], cycle_type="irregular"))
     assert r["ok"] and r["program"]["cycle_type"] == "irregular"
 

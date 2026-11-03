@@ -11,7 +11,6 @@ from typing import Any
 from app.repository import change_log_repo, programs_repo, schedule_repo, settings_repo
 
 Result = dict[str, Any]
-WARN_MIN, WARN_MAX = 2, 20
 
 
 def _fail(*msgs: str) -> Result:
@@ -24,7 +23,6 @@ def get_rules(conn: sqlite3.Connection) -> Result:
     return {
         "ok": True,
         "offweek_policy_default": settings_repo.get(conn, "offweek_policy_default", "rerun"),
-        "irregular_missing_warn_count": settings_repo.get(conn, "irregular_missing_warn_count", 4),
         "fixed_programs": [{"id": pid, "name": names.get(pid, "(삭제된 프로그램)")} for pid in fixed_ids],
         "holidays": schedule_repo.list_manual_holidays(conn),
     }
@@ -35,13 +33,6 @@ def save_rules(conn: sqlite3.Connection, payload: dict[str, Any]) -> Result:
     offweek = payload.get("offweek_policy_default")
     if offweek not in ("rerun", "empty"):
         errors.append("방송 없는 주 처리를 골라 주세요.")
-    try:
-        warn = int(payload.get("irregular_missing_warn_count"))
-        if not WARN_MIN <= warn <= WARN_MAX:
-            raise ValueError
-    except (TypeError, ValueError):
-        errors.append(f"부정기 누락 경고 횟수는 {WARN_MIN}~{WARN_MAX} 사이 숫자로 입력해 주세요.")
-        warn = 4
     fixed = [str(x) for x in (payload.get("fixed_program_ids") or [])]
     names = {pid for pid, _n, _a in programs_repo.name_index(conn)}
     if any(pid not in names for pid in fixed):
@@ -52,11 +43,10 @@ def save_rules(conn: sqlite3.Connection, payload: dict[str, Any]) -> Result:
         return _fail(*errors)
     before = get_rules(conn)
     settings_repo.set_value(conn, "offweek_policy_default", offweek)
-    settings_repo.set_value(conn, "irregular_missing_warn_count", warn)
     settings_repo.set_value(conn, "fixed_program_ids", fixed)
     change_log_repo.add(conn, "settings", None, "운영 설정 변경",
-                        {k: before[k] for k in ("offweek_policy_default", "irregular_missing_warn_count")},
-                        {"offweek_policy_default": offweek, "irregular_missing_warn_count": warn,
+                        {"offweek_policy_default": before["offweek_policy_default"]},
+                        {"offweek_policy_default": offweek,
                          "fixed_program_ids": fixed}, "운영 설정 변경")
     return {**get_rules(conn), "message": "설정을 저장했습니다."}
 

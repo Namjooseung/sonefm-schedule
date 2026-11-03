@@ -158,7 +158,6 @@ onBeforeUnmount(() => {
         <span v-if="cell?.source === 'manual'" class="badge">직접 수정</span>
         <span v-else-if="cell" class="badge">편성 자리대로</span>
         <span v-if="cell?.exception_type" class="badge badge-special">{{ cell.exception_type }}</span>
-        <span v-if="cell?.missing_warn" class="badge badge-danger">본방 입력 누락?</span>
       </div>
       <p v-if="cell?.original_name" class="orig">원래 편성: {{ cell.original_name }} → 결방</p>
       <p v-else-if="!cell && info?.rule" class="orig">원래 편성: {{ info.rule.name }} ({{ info.rule.kind }})</p>

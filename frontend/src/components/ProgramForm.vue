@@ -118,7 +118,7 @@ function askEnd() { confirming.value = 'end'; endDate.value = props.today }
           </label>
         </div>
         <p v-if="cycle === 'irregular'" class="hint small">
-          부정기 프로그램은 편성 자리가 모두 재방으로 깔립니다. 편성표에서 본방이 나가는 날 칸을 "본방으로" 바꿔 주세요.
+          비정기 프로그램은 편성 자리가 모두 재방으로 깔립니다. 편성표에서 본방이 나가는 날 칸을 "본방으로" 바꿔 주세요.
         </p>
         <p v-if="cycle === 'oneoff'" class="hint small">
           단발(특집) 프로그램은 편성 자리 없이 편성표의 칸에 직접 넣습니다.

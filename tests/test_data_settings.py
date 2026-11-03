@@ -112,10 +112,10 @@ def test_운영_설정_저장(tmp_path):
     s = api.settings_get()
     assert s["offweek_policy_default"] == "rerun" and len(s["fixed_programs"]) == 2
     pid = _add(api, "새벽 고정")
-    r = api.settings_save({"offweek_policy_default": "empty", "irregular_missing_warn_count": 6,
+    r = api.settings_save({"offweek_policy_default": "empty",
                            "fixed_program_ids": [p["id"] for p in s["fixed_programs"]] + [pid]})
-    assert r["ok"] and r["irregular_missing_warn_count"] == 6 and len(r["fixed_programs"]) == 3
-    assert not api.settings_save({"offweek_policy_default": "x", "irregular_missing_warn_count": 0,
+    assert r["ok"] and r["offweek_policy_default"] == "empty" and len(r["fixed_programs"]) == 3
+    assert not api.settings_save({"offweek_policy_default": "x",
                                   "fixed_program_ids": ["없음"]})["ok"]
 
 

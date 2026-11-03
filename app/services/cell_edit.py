@@ -167,7 +167,7 @@ def get_cell(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:
     row = schedule_repo.get_cell_row(conn, d, hour)
     display = schedule_repo.program_display(conn)
     rule = _rule_at(conn, d, hour)
-    episodes, missing = _episode_map(conn, d)
+    episodes = _episode_map(conn, d)
     info = episodes.get((d, hour))
     cancels = schedule_repo.cancellations_at(conn, d, hour)
     rule_slot = _slot(conn, rule.original_slot_id) if rule else None
@@ -182,7 +182,6 @@ def get_cell(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:
             "name": p.get("name", "?"), "category": p.get("category"), "is_special": p.get("is_special", False),
             "cycle_type": p.get("cycle_type"), "is_fixed": row["program_id"] in fixed,
             "episode": info.episode if info else None, "waiting": bool(info and info.waiting),
-            "missing_warn": (d, hour) in missing,
             "original_name": display.get(row["original_program_id"], {}).get("name") if row["original_program_id"] else None,
         }
     return {
@@ -192,7 +191,7 @@ def get_cell(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:
         "matches_rule": bool(row and rule and row["source"] == "rule"),
         "cancellations": [{"name": display.get(c["program_id"], {}).get("name", "?"), "reason": c["reason"]}
                           for c in cancels],
-        # '이후 전부'는 규칙 자리가 있을 때만 (부정기·단발은 본방/재방 전환을 이번만으로)
+        # '이후 전부'는 규칙 자리가 있을 때만 (비정기·단발은 본방/재방 전환을 이번만으로)
         "scope_available": rule_slot is not None,
         "kind_scope_available": bool(rule_slot and row and row["program_id"] == rule_slot.program_id
                                      and display.get(row["program_id"], {}).get("cycle_type") != "irregular"),

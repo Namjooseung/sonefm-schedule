@@ -14,8 +14,8 @@ def full(except_keys=()):
     return {(d, h): cell(d.isoformat(), h, "p") for d in NOV for h in HOURS if (d, h) not in except_keys}
 
 
-def run(cells, episodes=None, missing=(), orphans=(), conflicts=()):
-    return validate_month(NOV, HOURS, cells, episodes or {}, set(missing), list(orphans), list(conflicts))
+def run(cells, episodes=None, orphans=(), conflicts=()):
+    return validate_month(NOV, HOURS, cells, episodes or {}, list(orphans), list(conflicts))
 
 
 def test_다_채우면_문제없음():
@@ -40,11 +40,11 @@ def test_빈칸이_많으면_시각을_줄여서_표시():
     assert "06시, 07시, 08시, 09시 외 3칸" in first.detail
 
 
-def test_본방대기와_누락의심():
+def test_본방대기():
     cells = full()
-    k1, k2 = (D("2026-11-03"), 20), (D("2026-11-20"), 15)
-    issues = run(cells, episodes={k1: EpisodeInfo(None, waiting=True)}, missing=[k2])
-    assert [(i.kind, i.key) for i in issues] == [("본방 대기", k1), ("본방 입력 누락?", k2)]
+    k1 = (D("2026-11-03"), 20)
+    issues = run(cells, episodes={k1: EpisodeInfo(None, waiting=True)})
+    assert [(i.kind, i.key) for i in issues] == [("본방 대기", k1)]
 
 
 def test_고아예외와_자리충돌():
