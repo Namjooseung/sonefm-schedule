@@ -3,3 +3,4 @@ openpyxl==3.1.5
 holidays==0.62
 pytest==8.3.4
 pyinstaller==6.11.1
+pillow==11.0.0

@@ -28,6 +28,27 @@ cd frontend; npm run dev          # 1) Vite 개발 서버 (localhost:5173)
 python app/main.py --dev          # 2) 앱이 개발 서버를 로드, 개발자 도구 사용 가능
 ```
 
+## 설치 파일 만들기 (배포)
+
+```powershell
+# 0) 아이콘 (로고가 바뀌었을 때만): design/SONE_로고_96.3MHz_고화질.png → packaging/icon.ico
+python packaging/make_icon.py
+
+# 1) 화면 빌드
+cd frontend; npm run build; cd ..
+
+# 2) 실행 파일 (onedir) → dist/SoneFM/SoneFM.exe
+pyinstaller packaging/sonefm.spec --noconfirm
+
+# 3) 설치 파일 → packaging/Output/SoneFM편성표_Setup.exe
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" packaging\installer.iss
+```
+
+- 버전을 올릴 때는 `app/__init__.py`의 `APP_VERSION`과 `packaging/installer.iss`의 `AppVersion`을 같이 바꾼다. `AppId`는 절대 바꾸지 않는다(바꾸면 업데이트가 아니라 별개 프로그램으로 설치됨).
+- `installer.iss`는 UTF-8 **BOM 포함**으로 저장해야 한글이 깨지지 않는다.
+- 데이터는 exe 안이 아니라 `문서\SoneFM`에 있으므로 설치·업데이트·제거해도 남는다.
+- 실행 확인: 로그 `문서\SoneFM\logs\app.log`에 `화면 열림: {"bridge":true,...}`가 찍히면 화면과 Python 연결이 정상.
+
 ## 테스트
 
 ```powershell

@@ -23,3 +23,6 @@ packaging/Output/
 
 # 엑셀 임시 파일
 ~$*.xlsx
+
+# 아이콘 미리보기 (make_icon.py가 만듦)
+packaging/icon_preview.png

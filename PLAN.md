@@ -260,6 +260,7 @@ sonefm-scheduler/
   DESIGN.md                 -- 시각 디자인 기준 (사용자가 별도 제공)
   design/
     mockup.html             -- 편성표 화면 구성 시안 (레이아웃 참고용)
+    SONE_로고_96.3MHz_고화질.png -- 로고 (아이콘 원본)
   README.md                 -- 개발자용 실행·빌드 방법
   docs/
     인수인계_사용법.md        -- 비개발자용 (스크린샷 포함)
@@ -289,7 +290,8 @@ sonefm-scheduler/
   tests/
   packaging/
     sonefm.spec             -- PyInstaller
-    installer.iss           -- Inno Setup
+    installer.iss           -- Inno Setup (UTF-8 BOM)
+    make_icon.py, icon.ico  -- 로고 → 아이콘
   samples/                  -- 기존 편성표 엑셀 샘플 (가져오기 테스트용)
 ```
 
@@ -358,6 +360,11 @@ sonefm-scheduler/
 - 업데이트 설치 시 데이터 보존 확인.
 - 인수인계 문서: 설치(윈도우 "PC 보호" 경고 넘기는 법 포함), 월 편성 만들기, 특집·결방 처리, 마감, 백업 복원, 자주 나는 문제.
 - 완료 조건: 개발 도구가 없는 다른 윈도우 PC에서 설치 → 실행 → 한 달 편성 생성까지 성공.
+- 구현 (2026-11-03):
+  - 아이콘: 로고 전체를 정사각형 투명 바탕에 넣은 다중 크기 ico (`packaging/make_icon.py`, 사용자 선택 3안).
+  - PyInstaller onedir `dist/SoneFM/SoneFM.exe` (33MB), Inno Setup `SoneFM편성표_Setup.exe` (16MB): 관리자 권한 불필요(사용자별 설치), 바탕화면·시작 메뉴, 제거 프로그램, WebView2 없으면 안내.
+  - 개발 PC에서 확인: 조용히 설치 → 실행(화면·연결 정상) → 덮어 설치 후 DB 그대로 → 실행 → 제거(앱만 지워지고 데이터 남음).
+  - 남은 확인: 개발 도구 없는 다른 PC에서 설치 → 실행 → 한 달 편성 생성 (사용자 확인 필요).
 
 ---
 

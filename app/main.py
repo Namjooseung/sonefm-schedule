@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import time
 import sys
 from pathlib import Path
 
@@ -58,10 +59,26 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         url = index.as_uri()
 
-    webview.create_window(
+    window = webview.create_window(
         APP_NAME, url, js_api=Api(started.config),
         width=1440, height=900, min_size=(1100, 700),
     )
+
+    def on_loaded() -> None:
+        # 문제 해결용: 화면이 열렸는지, 내부 연결(pywebview)이 준비됐는지 로그에 남긴다
+        try:
+            time.sleep(2)   # 화면이 첫 데이터를 불러올 시간 (이 처리기는 별도 스레드에서 돈다)
+            state = window.evaluate_js(
+                "JSON.stringify({"
+                " bridge: !!(window.pywebview && window.pywebview.api),"
+                " title: document.querySelector('h1')?.innerText,"
+                " weeks: document.querySelectorAll('.weekrow').length,"
+                " error: document.querySelector('.callout-danger')?.innerText || null})")
+            log.info("화면 열림: %s", state)
+        except Exception:
+            log.exception("화면 상태 확인 실패")
+
+    window.events.loaded += on_loaded
     webview.start(debug=args.dev)
     return 0
 
