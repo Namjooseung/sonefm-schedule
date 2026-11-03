@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# 패키징 산출물
+build/
+dist/
+packaging/Output/
+
+# 로컬 DB·로그 (실제 데이터는 Documents\SoneFM 에 있음)
+*.db
+*.log
+
+# 편집기
+.vscode/
+.idea/
+
+# 엑셀 임시 파일
+~$*.xlsx

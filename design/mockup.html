@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>편성표 화면 시안</title>
+<!-- 시안 미리보기용 CDN. 실제 앱에서는 Pretendard woff2를 frontend/src/assets/fonts 에 넣어 로컬 로드할 것 (오프라인 앱) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  /* 바탕 */
+  --bg:#E9EDF1;          /* 앱 바탕 (스튜디오 벽) */
+  --surface:#FFFFFF;     /* 그리드·패널 */
+  --surface-2:#F5F7F9;   /* 헤더 줄, 비활성 */
+  --line:#D3DAE1;
+  --line-soft:#E6EAEE;
+  --ink:#18212C;
+  --ink-2:#4A5664;
+  --ink-3:#8793A0;
+  /* 분야 */
+  --edu:#1D6B73;  --edu-tint:#D3EBEC;  --edu-tint-2:#EBF5F5;   /* 교양 */
+  --ent:#B57A0A;  --ent-tint:#F5E4BE;  --ent-tint-2:#FBF3E2;   /* 오락 */
+  --sp:#5B45A8;   --sp-tint:#E4DDF5;                           /* 특집 */
+  /* 신호 */
+  --tally:#D0342C;       /* 온에어 램프 = 현재 월, 경고 */
+  --ok:#2F7D4F;
+  --warn-bg:#FBE7E5;
+  --radius-s:4px; --radius-m:8px;
+  --font:"Pretendard Variable",Pretendard,"Malgun Gothic",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.4 var(--font);font-feature-settings:"tnum";}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:148px 1fr 260px;height:100vh;min-width:1280px}
+
+/* 사이드바 */
+.side{background:var(--ink);color:#E9EDF1;display:flex;flex-direction:column;padding:18px 12px;gap:4px}
+.brand{display:flex;align-items:baseline;gap:6px;padding:0 8px 18px}
+.brand b{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.brand span{font-size:12px;color:#9AA7B4}
+.nav{all:unset;display:block;padding:9px 10px;border-radius:var(--radius-m);color:#B9C4CF;font-weight:500;cursor:pointer}
+.nav[aria-current="page"]{background:#2A3542;color:#fff}
+.nav:hover{background:#232E3A}
+.side .later{margin-top:16px;padding:0 10px;font-size:11px;color:#6E7C8A}
+.side .later div{padding:6px 0}
+
+/* 본문 */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 22px 0}
+.row1{display:flex;align-items:center;gap:14px}
+.title{font-size:22px;font-weight:800;letter-spacing:-.025em;margin:0}
+.status{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink-2)}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ent)}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-m);padding:7px 12px;font-weight:600}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#2A3542}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--radius-m);overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 10px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* 다이얼: 월 이동. 이 앱의 유일한 장식 요소 */
+.dial{position:relative;display:grid;grid-template-columns:repeat(12,1fr);margin:14px -22px 0;padding:0 22px;height:46px;
+  background:
+    repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 100%) 0 0/calc((100% - 44px)/60) 8px no-repeat,
+    var(--surface);
+  background-origin:content-box;}
+.dial::after{content:"";position:absolute;left:22px;right:22px;top:0;height:8px;
+  background:repeating-linear-gradient(90deg,var(--line-soft) 0 1px,transparent 1px calc(100%/60));}
+.m{all:unset;position:relative;cursor:pointer;display:flex;align-items:flex-end;justify-content:center;padding-bottom:9px;
+  font-size:13px;font-weight:600;color:var(--ink-3);border-left:1px solid var(--line)}
+.m:first-child{border-left:0}
+.m::before{content:"";position:absolute;top:0;left:50%;width:1px;height:14px;background:var(--ink-3)}
+.m:hover{color:var(--ink)}
+.m small{font-weight:500;font-size:10px;margin-left:3px;color:inherit;opacity:.8}
+.m[aria-current="true"]{color:var(--ink);font-weight:800}
+.m[aria-current="true"]::before{width:3px;margin-left:-1px;height:100%;background:var(--tally)}
+.m[aria-current="true"]::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--tally)}
+.m.done{color:var(--ink-2)}
+
+/* 그리드 영역 */
+.scroll{flex:1;overflow:auto;padding:18px 22px 40px}
+.week{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-m);margin-bottom:14px;overflow:hidden}
+.week.ref{opacity:.55}
+.week-head{display:grid;grid-template-columns:44px repeat(7,1fr);background:var(--surface-2);border-bottom:1px solid var(--line)}
+.wk-label{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;padding:4px 0}
+.wk-label b{font-size:12px;font-weight:800;color:var(--ink)}
+.wk-label span{font-size:10px;font-weight:600;color:var(--ink-3)}
+.dh{padding:7px 8px;border-left:1px solid var(--line-soft);display:flex;align-items:baseline;gap:6px}
+.dh b{font-size:14px;font-weight:700}
+.dh span{font-size:12px;color:var(--ink-3)}
+.dh.sat span{color:#2D5DA8}.dh.sun span,.dh.hol span{color:var(--tally)}
+.dh .hn{font-size:11px;color:var(--tally);margin-left:auto}
+.dh.out b,.dh.out span{color:var(--ink-3)}
+.ref-note{grid-column:1/-1;padding:6px 10px;font-size:12px;color:var(--ink-2);background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.ref-note button{all:unset;cursor:pointer;color:var(--edu);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+
+.grid{display:grid;grid-template-columns:52px repeat(7,1fr)}
+.hr{font-size:12px;color:var(--ink-3);text-align:right;padding:0 7px;border-top:1px solid var(--line-soft);display:flex;align-items:center;justify-content:flex-end}
+.c{position:relative;border-left:1px solid var(--line-soft);border-top:1px solid var(--line-soft);height:38px;padding:0 8px 0 11px;
+   display:flex;align-items:center;gap:4px;cursor:pointer;min-width:0}
+.c::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.c .n{flex:1;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.c .e{font-size:11px;color:var(--ink-2);flex:none}
+.c .r{font-size:10px;font-weight:700;flex:none;padding:0 3px;border-radius:3px;border:1px solid currentColor;line-height:14px;opacity:.75}
+/* 분야 × 본방/재방 */
+.c.edu.on{background:var(--edu-tint)}.c.edu::before{background:var(--edu)}
+.c.ent.on{background:var(--ent-tint)}.c.ent::before{background:var(--ent)}
+.c.edu.re{background:var(--edu-tint-2)}.c.ent.re{background:var(--ent-tint-2)}
+.c.re .n{font-weight:500;color:var(--ink-2)}
+.c.edu .r{color:var(--edu)}.c.ent .r{color:var(--ent)}
+.c.fixed{background:var(--surface-2)}.c.fixed::before{background:var(--ink-3)}
+.c.fixed .n{font-weight:500;color:var(--ink-2)}
+.c.sp{background:var(--sp-tint)}.c.sp::before{background:var(--sp)}
+.c.sp .n{color:var(--sp)}
+.fixrow{grid-column:2/-1;height:34px;display:flex;align-items:center;gap:12px;padding:0 14px;border-top:1px solid var(--line-soft);border-left:1px solid var(--line-soft);
+  background:var(--surface-2);position:relative}
+.fixrow::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ink-3)}
+.fixrow b{font-size:15px;font-weight:800;letter-spacing:-.01em;color:var(--ink-2)}
+.fixrow span{font-size:12px;color:var(--ink-3)}
+.compact .fixrow{height:24px}.compact .fixrow b{font-size:13px}
+/* 사람이 손댄 칸 */
+.c.manual{box-shadow:inset 0 0 0 1.5px var(--ink-2)}
+.c.wait{background:repeating-linear-gradient(135deg,#fff 0 6px,var(--warn-bg) 6px 12px)}
+.c.wait::before{background:var(--tally)}
+.c.wait .n{color:var(--tally)}
+.c.out{opacity:.45}
+.c .flag{width:6px;height:6px;border-radius:50%;flex:none}
+.c .flag.in{background:var(--ok)}.c .flag.miss{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-3)}
+.c:hover{filter:brightness(.97)}
+.c.sel{outline:2px solid var(--ink);outline-offset:-2px;z-index:2}
+
+/* 압축 모드 */
+.compact .c{height:26px;font-size:12px}
+.compact .c .n{font-size:12px}
+.compact .c .e{font-size:10px}
+.compact .c .r,.compact .c .flag{display:none}
+.compact .hr{font-size:10px}
+
+/* 팝업 */
+.pop{position:absolute;z-index:10;width:292px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-m);
+  box-shadow:0 12px 32px rgba(24,33,44,.18),0 2px 6px rgba(24,33,44,.08)}
+.pop header{padding:12px 14px;border-bottom:1px solid var(--line-soft)}
+.pop .pn{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.pop .pm{font-size:12px;color:var(--ink-2);margin-top:2px}
+.pop .tog{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 14px}
+.pop .tog button{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-s);padding:7px;font-weight:600}
+.pop .tog button[aria-pressed="true"]{background:var(--ent-tint);border-color:var(--ent);color:#7A5205}
+.pop ul{list-style:none;margin:0;padding:4px 6px 8px}
+.pop li button{all:unset;display:flex;justify-content:space-between;width:100%;box-sizing:border-box;padding:8px 8px;border-radius:var(--radius-s);cursor:pointer}
+.pop li button:hover{background:var(--surface-2)}
+.pop li button span{color:var(--ink-3);font-size:12px}
+.pop li.danger button{color:var(--tally)}
+.pop footer{border-top:1px solid var(--line-soft);padding:9px 14px;font-size:12px;color:var(--ink-3)}
+
+/* 오른쪽 패널 */
+.aside{background:var(--surface);border-left:1px solid var(--line);padding:18px 16px;overflow:auto}
+.aside h2{font-size:13px;font-weight:700;margin:0 0 10px;color:var(--ink-2)}
+.gauge{margin-bottom:14px}
+.gauge .gl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.gauge .gl b{font-size:14px}
+.gauge .bar{position:relative;height:8px;background:var(--surface-2);border-radius:999px;border:1px solid var(--line-soft)}
+.gauge .fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--ok)}
+.gauge .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.gauge.bad .fill{background:var(--tally)}
+.gauge.bad .gl b{color:var(--tally)}
+.gauge .gs{font-size:11px;color:var(--ink-3);margin-top:4px}
+.issues{list-style:none;margin:0;padding:0}
+.issues li{border:1px solid var(--line);border-radius:var(--radius-m);padding:9px 10px;margin-bottom:8px;cursor:pointer}
+.issues li:hover{background:var(--surface-2)}
+.issues .it{font-weight:600;font-size:12.5px}
+.issues .id{font-size:12px;color:var(--ink-2);margin-top:2px}
+.issues li.bad{border-color:#EDB8B3;background:var(--warn-bg)}
+.legend{display:grid;gap:7px;font-size:12px;color:var(--ink-2);margin-top:6px}
+.legend div{display:flex;align-items:center;gap:8px}
+.sw{width:22px;height:14px;border-radius:3px;position:relative;overflow:hidden}
+.sw::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.sep{height:1px;background:var(--line-soft);margin:16px 0}
+.total{font-size:12px;color:var(--ink-2)}
+.total b{color:var(--ink);font-size:13px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <nav class="side" aria-label="메뉴">
+    <div class="brand"><b>SoneFM</b><span>96.3</span></div>
+    <a class="nav" aria-current="page">편성표</a>
+    <a class="nav">프로그램</a>
+    <a class="nav">설정</a>
+    <div class="later"><div>방송일지</div><div>보고서</div><div>유튜브</div></div>
+  </nav>
+
+  <main class="main">
+    <div class="top">
+      <div class="row1">
+        <h1 class="title">2026년 11월 편성표</h1>
+        <span class="status">작성 중</span>
+        <div class="spacer"></div>
+        <div class="seg" role="group" aria-label="보기 밀도">
+          <button aria-pressed="true" data-d="normal">기본</button>
+          <button aria-pressed="false" data-d="compact">압축</button>
+        </div>
+        <button class="btn">첫 주 불러오기</button>
+        <button class="btn">월단위 생성</button>
+        <button class="btn">엑셀 내보내기</button>
+        <button class="btn primary">편성 확정</button>
+      </div>
+      <div class="dial" aria-label="월 선택" id="dial"></div>
+    </div>
+    <div class="scroll" id="scroll"></div>
+  </main>
+
+  <aside class="aside">
+    <div class="total">11월 총 방송 <b>30,600분</b> / 기준 30,600분</div>
+    <div class="sep"></div>
+    <h2>확인할 것 3건</h2>
+    <ul class="issues">
+      <li class="bad"><div class="it">본방 대기</div><div class="id">추억의 책장 · 11/3(화) 20시 — 재방할 본방이 아직 없어요</div></li>
+      <li><div class="it">본방 입력 누락?</div><div class="id">그 삶이다 · 7화 재방이 4주째 이어지고 있어요</div></li>
+      <li><div class="it">결방 후 회차 이어받음</div><div class="id">오후의 플레이리스트 · 11/18 특집으로 결방, 11/25가 12화</div></li>
+    </ul>
+
+    <div class="sep"></div>
+    <h2>범례</h2>
+    <div class="legend">
+      <div><span class="sw" style="background:var(--edu-tint)"><i></i></span>교양 본방</div>
+      <div><span class="sw" style="background:var(--edu-tint-2)"></span>교양 재방</div>
+      <div><span class="sw" style="background:var(--ent-tint)"></span>오락 본방</div>
+      <div><span class="sw" style="background:var(--ent-tint-2)"></span>오락 재방</div>
+      <div><span class="sw" style="background:var(--sp-tint)"></span>특집</div>
+      <div><span class="sw" style="box-shadow:inset 0 0 0 1.5px var(--ink-2)"></span>직접 수정한 칸</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ── 시안용 가짜 데이터 ──────────────────────────────────────────
+const P = {
+  gm:{n:"굿모닝!",c:"ent",fixed:1}, gb:{n:"굿바이!",c:"ent",fixed:1},
+  op:{n:"오후의 플레이리스트",c:"ent",ep:9},
+  sj:{n:"수원은 지금",c:"edu",ep:3},
+  ma:{n:"마을살이 정류장",c:"edu",ep:41},
+  ye:{n:"예술아 지구랑 놀자꾸나",c:"edu",ep:18},
+  pr:{n:"[10기] 프로포즈",c:"edu",ep:6},
+  gs:{n:"[10기] 그 삶이다",c:"edu",ep:7,irr:1},
+  pp:{n:"[10기] 삐삐우체통",c:"edu",ep:5},
+  jj:{n:"[10기] 정조의 초대",c:"edu",ep:6},
+  cb:{n:"[10기] 추억의 책장",c:"edu",ep:0,newp:1},
+  hy:{n:"[한양대 플레이리스트] 청춘은 00이다",c:"ent",ep:22},
+  mg:{n:"[물고을 대안학교]",c:"edu",ep:14},
+  ss:{n:"[10기] 생존신고",c:"edu",ep:4},
+  nm:{n:"[10기] 놀다보니 마을 이야기",c:"edu",ep:8},
+};
+// 요일(0=월) → 시 → [프로그램, 역할]
+const slots = {
+ 0:{10:["ye","on"],14:["hy","on"],17:["jj","re"],20:["op","re"]},
+ 1:{11:["ma","on"],13:["nm","on"],15:["pr","on"],20:["cb","re"]},
+ 2:{11:["pp","on"],14:["op","on"],17:["mg","re"],21:["hy","re"]},
+ 3:{11:["jj","on"],15:["sj","on"],19:["ye","re"],21:["ss","re"]},
+ 4:{11:["gs","on"],15:["cb","on"],19:["ma","re"],21:["nm","re"]},
+ 5:{10:["op","re"],14:["mg","on"],18:["pr","re"]},
+ 6:{10:["ss","on"],12:["pp","re"],15:["sj","re"]},
+};
+const fillers=["ma","ye","pr","pp","jj","nm","ss","mg","hy","op"];
+const HOURS=[...Array(17)].map((_,i)=>i+6);
+function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/86400000+1)/7);}
+const DOW=["월","화","수","목","금","토","일"];
+
+const start=new Date(2026,9,26);        // 참고 줄 10/26(월)
+const weeks=[]; for(let w=0;w<6;w++){weeks.push([...Array(7)].map((_,d)=>{const x=new Date(start);x.setDate(start.getDate()+w*7+d);return x;}));}
+
+const last={}; Object.keys(P).forEach(k=>last[k]=P[k].ep);
+let fi=0;
+function cellFor(date,dow,h){
+  const key=`${date.getMonth()+1}/${date.getDate()}`;
+  if(h===6) return {p:"gm",k:"fixed"};
+  if(h===22) return {p:"gb",k:"fixed"};
+  // 예외들
+  if(key==="11/18"&&h===14) return {sp:"가을 음악회 실황 특집",manual:1};
+  let s=slots[dow][h];
+  if(!s){ const p=fillers[(fi++)%fillers.length]; s=[p,"re"]; }
+  let [p,role]=s;
+  // 격주: 수원은 지금 — 11/5, 11/19, 12/3만 본방
+  if(p==="sj"&&role==="on"&&!["11/5","11/19","12/3"].includes(key)) role="re";
+  // 부정기: 그 삶이다 — 사용자가 본방 지정한 날 없음(재방 유지)
+  let manual=0;
+  if(P[p].irr&&role==="on") role="re";
+  // 추억의 책장 신규: 11/6 첫 본방
+  if(p==="cb"&&role==="on"&&key==="10/30") role="re";
+  if(role==="on"){ last[p]+=1; }
+  const ep=last[p];
+  if(P[p].newp&&ep===0) return {p,k:"wait"};
+  return {p,k:role,ep,manual};
+}
+
+function render(){
+  const sc=document.getElementById("scroll");
+  sc.innerHTML="";
+  weeks.forEach((days,wi)=>{
+    const isRef=wi===0;
+    const wk=document.createElement("section");
+    wk.className="week"+(isRef?" ref":"");
+    let head=`<div class="week-head">`;
+    if(isRef) head+=`<div class="ref-note">10월 마지막 주 (참고용, 읽기 전용) · <button>10월에서 편집</button></div>`;
+    head+=`<div class="wk-label"><b>${isRef?"10월":wi+"주"}</b><span>${isoWeek(days[0])}주차</span></div>`;
+    days.forEach((d,di)=>{
+      const out=d.getMonth()!==10;
+      head+=`<div class="dh ${di===5?"sat":""} ${di===6?"sun":""} ${out&&!isRef?"out":""}"><b>${d.getMonth()+1}.${d.getDate()}</b><span>${DOW[di]}</span></div>`;
+    });
+    head+=`</div>`;
+    let g=`<div class="grid">`;
+    HOURS.forEach(h=>{
+      g+=`<div class="hr">${String(h).padStart(2,"0")}</div>`;
+      if(h===6||h===22){
+        const nm=h===6?"굿모닝!":"굿바이!";
+        g+=`<div class="fixrow" title="매일 고정 편성"><b>${nm}</b><span>매일 ${h===6?"06:00":"22:00"} · 고정 편성</span></div>`;
+        return;
+      }
+      days.forEach((d,di)=>{
+        const c=cellFor(d,di,h);
+        const out=d.getMonth()!==10&&!isRef;
+        const id=`${d.getMonth()+1}-${d.getDate()}-${h}`;
+        if(c.sp){ g+=`<div class="c sp manual ${out?"out":""}" data-id="${id}" title="${c.sp}"><span class="n">${c.sp}</span><span class="e">특집</span></div>`; return; }
+        const pr=P[c.p];
+        const cls=["c",pr.c,c.k==="fixed"?"fixed":c.k,c.manual?"manual":"",out?"out":""].join(" ");
+        const ep=c.k==="on"||c.k==="re"?`<span class="e">${c.ep}화</span>`:"";
+        const r=c.k==="re"?`<span class="r">재</span>`:"";
+        const flag=c.k==="on"?`<span class="flag ${(d.getDate()%3)?"in":"miss"}" title="송출 파일"></span>`:"";
+        const label=c.k==="wait"?`${pr.n} · 본방 대기`:pr.n;
+        g+=`<div class="${cls}" data-id="${id}" title="${label}">${flag}<span class="n">${label}</span>${r}${ep}</div>`;
+      });
+    });
+    g+=`</div>`;
+    wk.innerHTML=head+g;
+    sc.appendChild(wk);
+  });
+  // 예시 팝업: 11/18(수) 14시
+  const target=sc.querySelector('[data-id="11-18-14"]');
+  if(target){
+    target.classList.add("sel");
+    const r=target.getBoundingClientRect(), s=sc.getBoundingClientRect();
+    const pop=document.createElement("div");
+    pop.className="pop";
+    pop.style.left=(r.right-s.left+sc.scrollLeft+8)+"px";
+    pop.style.top=(r.top-s.top+sc.scrollTop-40)+"px";
+    pop.innerHTML=`
+      <header><div class="pn">가을 음악회 실황 특집</div>
+      <div class="pm">11월 18일 (수) 14:00 · 오락 · 원래 편성: 오후의 플레이리스트 12화 → 결방</div></header>
+      <div class="tog"><button aria-pressed="true">본방</button><button aria-pressed="false">재방</button></div>
+      <ul>
+        <li><button>다른 프로그램으로 교체 <span>이번만 / 이후 전부</span></button></li>
+        <li><button>특집 정보 수정</button></li>
+        <li><button>재방 회차 지정</button></li>
+        <li><button>실제 변경 기록 <span>사고·긴급 결방</span></button></li>
+        <li><button>송출 파일 <span>미입고</span></button></li>
+        <li class="danger"><button>원래대로 되돌리기</button></li>
+      </ul>
+      <footer>마지막 수정 11/3 14:52</footer>`;
+    sc.style.position="relative";
+    sc.appendChild(pop);
+  }
+}
+
+function dial(){
+  const el=document.getElementById("dial");
+  el.innerHTML=[...Array(12)].map((_,i)=>{
+    const m=i+1;
+    return `<button class="m ${m<11?"done":""}" ${m===11?'aria-current="true"':""}>${m}월${m<10?"<small>마감</small>":m===10?"<small>확정</small>":""}</button>`;
+  }).join("");
+}
+
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  document.getElementById("app").classList.toggle("compact",b.dataset.d==="compact");
+  Object.keys(P).forEach(k=>last[k]=P[k].ep); fi=0; render();
+}));
+
+dial(); render();
+</script>
+</body>
+</html>
