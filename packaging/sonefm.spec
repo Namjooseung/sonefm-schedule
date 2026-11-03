@@ -25,7 +25,7 @@ a = Analysis(
     pathex=[str(ROOT)],
     datas=datas,
     hiddenimports=hiddenimports,
-    excludes=["tkinter", "pytest", "PIL", "PyInstaller"],
+    excludes=["tkinter", "pytest", "PIL", "PyInstaller", "cryptography", "pdfplumber", "pdfminer", "pypdfium2"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
