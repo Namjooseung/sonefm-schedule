@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
@@ -19,7 +20,9 @@ from app.domain import programs as program_rules
 from app.repository import meta_repo
 from app.repository import change_log_repo
 from app.services import cell_edit, month_status
+from app.services import data as data_service
 from app.services import excel as excel_service
+from app.services import settings as settings_service
 from app.services import programs as program_service
 from app.services import schedule as schedule_service
 
@@ -194,3 +197,74 @@ class Api:
         if not path.lower().endswith(".xlsx"):
             path += ".xlsx"
         return self._run("excel_export", lambda c: excel_service.export_months(c, [(int(year), int(month))], path))
+
+    # ── 설정: 운영 기준값·임시공휴일 ──────────────
+    def settings_get(self) -> dict[str, Any]:
+        return self._run("settings_get", settings_service.get_rules)
+
+    def settings_save(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._run("settings_save", lambda c: settings_service.save_rules(c, payload or {}))
+
+    def holiday_add(self, date: str, name: str) -> dict[str, Any]:
+        return self._run("holiday_add", lambda c: settings_service.add_holiday(c, date, name))
+
+    def holiday_delete(self, date: str) -> dict[str, Any]:
+        return self._run("holiday_delete", lambda c: settings_service.delete_holiday(c, date))
+
+    # ── 데이터 파일: 백업·복원·이동 ───────────────
+    def _safe(self, name: str, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        try:
+            return fn()
+        except Exception:
+            log.exception("%s 실패", name)
+            return {"ok": False, "errors": [_UNEXPECTED]}
+
+    def _dialog(self, kind: str, **kw: Any) -> str | None:
+        import webview
+        win = self._window()
+        if win is None:
+            return None
+        const = {"open": webview.OPEN_DIALOG, "save": webview.SAVE_DIALOG, "folder": webview.FOLDER_DIALOG}[kind]
+        picked = win.create_file_dialog(const, **kw)
+        if not picked:
+            return None
+        return picked if isinstance(picked, str) else picked[0]
+
+    def data_info(self) -> dict[str, Any]:
+        cfg = self._cfg
+        return self._safe("data_info", lambda: {
+            "ok": True, "db_path": cfg.db_path, "backup_dir": cfg.backup_dir, "backup_keep": cfg.backup_keep,
+            "backups": data_service.list_backups(cfg)})
+
+    def backup_now(self) -> dict[str, Any]:
+        return self._safe("backup_now", lambda: data_service.backup_now(self._cfg))
+
+    def backup_restore(self, path: str) -> dict[str, Any]:
+        """백업 파일로 되돌리기. 이전 작업의 Ctrl+Z 기록은 지운다."""
+        result = self._safe("backup_restore", lambda: data_service.restore(self._cfg, path))
+        if result.get("ok"):
+            self._undo.clear()
+        return result
+
+    def data_import_pick(self) -> dict[str, Any]:
+        """다른 데이터 파일(내보낸 .db) 고르기."""
+        return {"ok": True, "path": self._dialog("open", file_types=("SoneFM 데이터 파일 (*.db)",))}
+
+    def data_export(self) -> dict[str, Any]:
+        name = f"SoneFM편성표_데이터_{datetime.now():%Y%m%d}.db"
+        picked = self._dialog("save", save_filename=name, file_types=("SoneFM 데이터 파일 (*.db)",))
+        if not picked:
+            return {"ok": True, "cancelled": True}
+        return self._safe("data_export", lambda: data_service.export_data(self._cfg, picked))
+
+    def pick_folder(self) -> dict[str, Any]:
+        return {"ok": True, "path": self._dialog("folder")}
+
+    def db_move(self, folder: str, mode: str = "copy") -> dict[str, Any]:
+        result = self._safe("db_move", lambda: data_service.change_db_location(self._cfg, folder, mode))
+        if result.get("ok"):
+            self._undo.clear()
+        return result
+
+    def backup_options(self, folder: str | None, keep: Any) -> dict[str, Any]:
+        return self._safe("backup_options", lambda: data_service.set_backup_options(self._cfg, folder, keep))

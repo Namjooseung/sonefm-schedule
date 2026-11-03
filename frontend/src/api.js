@@ -64,3 +64,18 @@ export const excelAnalyze = (path) => call('excel_analyze', path)
 /** mapping: 엑셀 이름 → { action: map|new|same|skip, program_id, target, category, is_listener_participation } */
 export const excelImport = (path, titles, mapping, overwrite = true) => call('excel_import', path, titles, mapping, overwrite)
 export const excelExport = (year, month) => call('excel_export', year, month)
+
+// ── 설정·데이터 파일 ──
+export const settingsGet = () => call('settings_get')
+export const settingsSave = (payload) => call('settings_save', payload)
+export const holidayAdd = (date, name) => call('holiday_add', date, name)
+export const holidayDelete = (date) => call('holiday_delete', date)
+export const dataInfo = () => call('data_info')
+export const backupNow = () => call('backup_now')
+export const backupRestore = (path) => call('backup_restore', path)
+export const dataImportPick = () => call('data_import_pick')
+export const dataExport = () => call('data_export')
+export const pickFolder = () => call('pick_folder')
+/** mode: 'copy' 지금 데이터를 새 폴더로 복사 | 'use_existing' 그 폴더의 데이터 파일 쓰기 */
+export const dbMove = (folder, mode) => call('db_move', folder, mode)
+export const backupOptions = (folder, keep) => call('backup_options', folder, keep)

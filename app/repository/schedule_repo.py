@@ -272,3 +272,20 @@ def months_using(conn: sqlite3.Connection, after: date, program_ids: list[str]) 
         f"SELECT DISTINCT date FROM schedule_cells WHERE date > ? AND program_id IN ({marks})",
         (after.isoformat(), *program_ids))
     return [r[0] for r in rows]
+
+
+def list_manual_holidays(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = conn.execute("SELECT date, name FROM holidays WHERE source = 'manual' ORDER BY date")
+    return [dict(r) for r in rows]
+
+
+def add_manual_holiday(conn: sqlite3.Connection, d: date, name: str) -> None:
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO holidays (id, date, name, source, created_at, updated_at) VALUES (?, ?, ?, 'manual', ?, ?)"
+        " ON CONFLICT(date, source) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at",
+        (new_id(), d.isoformat(), name, ts, ts))
+
+
+def delete_manual_holiday(conn: sqlite3.Connection, d: date) -> None:
+    conn.execute("DELETE FROM holidays WHERE source = 'manual' AND date = ?", (d.isoformat(),))
