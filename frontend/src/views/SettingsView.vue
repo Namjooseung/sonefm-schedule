@@ -2,6 +2,7 @@
 // 설정 화면 — 지금은 데이터 파일 정보만 보여준다. 나머지 설정 항목은 P5·P7에서 추가.
 import { onMounted, ref } from 'vue'
 import { ping } from '../api.js'
+import ImportWizard from '../components/ImportWizard.vue'
 
 const info = ref(null)
 onMounted(async () => { info.value = await ping() })
@@ -20,11 +21,15 @@ onMounted(async () => { info.value = await ping() })
         <dt>데이터 구조 버전</dt><dd>{{ info.schema_version }}</dd>
       </dl>
     </div>
+    <div class="card body">
+      <h2>기존 엑셀 편성표 가져오기</h2>
+      <ImportWizard />
+    </div>
   </section>
 </template>
 
 <style scoped>
-.page { padding: var(--space-300); display: grid; gap: var(--space-200); align-content: start; max-width: 880px; }
+.page { padding: var(--space-300); display: grid; gap: var(--space-200); align-content: start; max-width: 1100px; overflow: auto; height: 100%; }
 h1 { font-size: var(--text-400); line-height: var(--leading-400); font-weight: var(--font-weight-bold); }
 h2 { font-size: var(--text-100); line-height: var(--leading-100); font-weight: var(--font-weight-medium); }
 .body { padding: var(--space-300); display: grid; gap: var(--space-150); }

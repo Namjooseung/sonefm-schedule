@@ -4,7 +4,7 @@
 1. build_rule_cells(날짜들, ...) — 규칙만으로 만든 칸. "첫 주 불러오기"는 첫 주 날짜만,
    "월단위 생성"은 나머지 주 날짜를 넘긴다. 날짜마다 주기를 다시 판정하므로 첫 주를 복사하지 않는다.
 2. plan_generation(규칙 칸, 기존 칸, 결방 기록, 덮어쓰기 여부) — 실제로 바꿀 목록.
-   - 사람이 손댄 칸(source=manual)은 기본 유지. 규칙과 다르면 manual_conflicts로 돌려줘 화면이 확인창을 띄운다.
+   - 사람이 손댄 칸(source=manual)과 엑셀에서 가져온 칸(import)은 기본 유지. 규칙과 다르면 manual_conflicts로 돌려줘 화면이 확인창을 띄운다.
    - 결방 기록이 있는 원래 칸은 규칙 칸을 만들지 않는다.
    - 특집·교체 같은 일회성 예외는 manual 칸이라 다른 날짜로 퍼지지 않는다.
 
@@ -100,11 +100,11 @@ def plan_generation(
         cur = existing.get(key)
         if rule is not None and (rule.program_id, key[0], key[1]) in cancellations:
             # 결방된 원래 칸: 그 자리를 채운 사람 칸(교체·특집)은 건드리지 않는다
-            if cur is not None and cur.source != "manual":
+            if cur is not None and cur.source == "rule":
                 plan.deletes.append(key)
             continue
 
-        if cur is not None and cur.source == "manual":
+        if cur is not None and cur.source != "rule":   # manual(사람) · import(엑셀)
             differs = rule is None or not _same(rule, cur)
             if not differs:
                 continue

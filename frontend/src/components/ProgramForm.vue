@@ -137,6 +137,10 @@ function askEnd() { confirming.value = 'end'; endDate.value = props.today }
             <input v-model="draft.start_date" type="date" class="input" />
           </label>
           <div class="field">
+            <span>회차 표시</span>
+            <label class="check"><input v-model="draft.show_episode" type="checkbox" /> 편성표·엑셀에 회차(_23화) 붙이기</label>
+          </div>
+          <div class="field">
             <span>종영일</span>
             <input :value="draft.end_date || '방송 중'" class="input" readonly />
           </div>

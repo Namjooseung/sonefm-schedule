@@ -9,7 +9,7 @@ from app.repository._common import new_id, now_iso
 _PROGRAM_COLS = (
     "name", "category", "is_listener_participation", "producer_type", "cycle_type",
     "cycle_anchor_date", "monthly_nth", "offweek_policy", "start_episode", "start_date",
-    "end_date", "host", "cohort", "is_special", "memo",
+    "end_date", "host", "cohort", "is_special", "memo", "show_episode",
 )
 _SLOT_COLS = ("weekday", "hour", "role", "valid_from", "valid_to")
 
@@ -18,6 +18,7 @@ def _program_row(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
     d["is_listener_participation"] = bool(d["is_listener_participation"])
     d["is_special"] = bool(d["is_special"])
+    d["show_episode"] = bool(d["show_episode"])
     return d
 
 

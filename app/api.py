@@ -7,16 +7,19 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from pathlib import Path
 from collections.abc import Callable
 from typing import Any
 
 from app import APP_VERSION
+from app.backup import backup_db
 from app.config import AppConfig
 from app.db.connection import open_db
 from app.domain import programs as program_rules
 from app.repository import meta_repo
 from app.repository import change_log_repo
 from app.services import cell_edit, month_status
+from app.services import excel as excel_service
 from app.services import programs as program_service
 from app.services import schedule as schedule_service
 
@@ -145,3 +148,49 @@ class Api:
     def month_status(self, year: int, month: int, action: str, reason: str = "") -> dict[str, Any]:
         """action: confirm(확정) | reopen(확정 취소) | close(마감) | unlock(잠금 해제, 사유 필수)"""
         return self._run("month_status", lambda c: month_status.change(c, year, month, action, reason))
+
+    # ── 엑셀 ──────────────────────────────────────
+    def _window(self):  # type: ignore[no-untyped-def]
+        import webview
+        return webview.windows[0] if webview.windows else None
+
+    def excel_pick_file(self) -> dict[str, Any]:
+        """가져올 엑셀 파일 고르기 (열기 창)."""
+        import webview
+        win = self._window()
+        if win is None:
+            return {"ok": False, "errors": ["파일 선택 창을 열 수 없습니다."]}
+        picked = win.create_file_dialog(webview.OPEN_DIALOG, file_types=("엑셀 파일 (*.xlsx;*.xlsm)",))
+        return {"ok": True, "path": picked[0] if picked else None}
+
+    def excel_analyze(self, path: str) -> dict[str, Any]:
+        return self._run("excel_analyze", lambda c: excel_service.analyze(c, path))
+
+    def excel_import(self, path: str, titles: list[str], mapping: dict[str, Any], overwrite: bool = True) -> dict[str, Any]:
+        """가져오기 전에 DB를 백업한다 (되돌리기 대신 백업으로 복원)."""
+        try:
+            backup = backup_db(self._cfg.db_path, self._cfg.backup_dir, reason="before-import")
+        except Exception:
+            log.exception("가져오기 전 백업 실패")
+            return {"ok": False, "errors": ["가져오기 전 백업을 만들지 못해 중단했습니다. 백업 폴더를 확인해 주세요."]}
+        result = self._run("excel_import", lambda c: excel_service.run_import(c, path, titles or [], mapping or {}, bool(overwrite)))
+        if result.get("ok") and backup:
+            result["backup"] = str(backup)
+        return result
+
+    def excel_export(self, year: int, month: int) -> dict[str, Any]:
+        """그 달 편성표를 엑셀로 저장 (저장 창). 수식 없이 글자만."""
+        import webview
+        win = self._window()
+        if win is None:
+            return {"ok": False, "errors": ["저장 창을 열 수 없습니다."]}
+        name = f"SoneFM편성표_{int(year)}년{int(month):02d}월.xlsx"
+        docs = Path(self._cfg.db_path).parent.parent
+        picked = win.create_file_dialog(webview.SAVE_DIALOG, directory=str(docs), save_filename=name,
+                                        file_types=("엑셀 파일 (*.xlsx)",))
+        if not picked:
+            return {"ok": True, "cancelled": True}
+        path = picked if isinstance(picked, str) else picked[0]
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+        return self._run("excel_export", lambda c: excel_service.export_months(c, [(int(year), int(month))], path))

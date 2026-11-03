@@ -131,3 +131,13 @@ def test_일회성_예외는_퍼지지_않음():
     by_key = {c.key: c.program_id for c in plan.upserts}
     assert by_key[(D("2026-11-10"), 11)] == "p"
     assert (D("2026-11-03"), 11) not in by_key
+
+
+def test_엑셀에서_가져온_칸도_보호():
+    p = prog("p")
+    rule, _ = _gen([p], [slot("s", "p", 1, 11)], FIRST_WEEK)
+    imported = cell("2026-11-03", 11, "other", source="import")
+    plan = _plan(rule, [imported])
+    assert plan.upserts == [] and [c.key for c in plan.manual_conflicts] == [(D("2026-11-03"), 11)]
+    stale_import = cell("2026-11-04", 9, "old", source="import")
+    assert _plan(rule, [stale_import]).deletes == []

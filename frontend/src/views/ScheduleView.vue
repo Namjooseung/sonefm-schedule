@@ -191,6 +191,15 @@ function pickBandDay(d) {
   openCell(`${d.date}|${b.hour}`, b.rect)
 }
 
+// ── 엑셀 내보내기 (수식 없이 글자만) ──
+async function exportExcel() {
+  busy.value = true
+  const r = await api.excelExport(year.value, month.value)
+  busy.value = false
+  if (!r.ok) { flash(r.errors[0], true); return }
+  if (!r.cancelled) flash(r.message)
+}
+
 // ── 되돌리기 (Ctrl+Z) ──
 async function doUndo() {
   if (busy.value) return
@@ -244,21 +253,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             class="btn" :class="{ 'btn-primary': data && data.first_week_filled }"
             :disabled="busy || !data || data.status === '마감'" @click="generate('rest')"
           >월단위 생성</button>
-          <button class="btn" :disabled="busy || !canUndo" title="Ctrl+Z" @click="doUndo">되돌리기</button>
-          <button class="btn" @click="logOpen = true">변경 기록</button>
-          <button class="btn btn-sm panel-toggle" :aria-pressed="panelOpen" @click="panelOpen = !panelOpen">
-            {{ panelOpen ? '패널 닫기' : '패널 열기' }}
-          </button>
         </div>
         <MonthDial :year="year" :month="month" :statuses="data?.year_statuses || {}" @select="go" />
       </header>
 
       <div class="scroll" @scroll.passive="onScroll">
-        <div v-if="data && !monthEmpty" class="toolbar">
-          <span class="muted small">칸을 누르면 결방·교체·특집 등을 할 수 있습니다. 주 이름을 누르면 접고 펼칩니다.</span>
+        <div v-if="data" class="toolbar">
+          <span v-if="!monthEmpty" class="muted small">칸을 누르면 결방·교체·특집 등을 할 수 있습니다. 주 이름을 누르면 접고 펼칩니다.</span>
           <span class="spacer" />
-          <button class="btn btn-ghost btn-sm" @click="setAllFolded(false)">모두 펼치기</button>
-          <button class="btn btn-ghost btn-sm" @click="setAllFolded(true)">모두 접기</button>
+          <template v-if="!monthEmpty">
+            <button class="btn btn-ghost btn-sm" @click="setAllFolded(false)">모두 펼치기</button>
+            <button class="btn btn-ghost btn-sm" @click="setAllFolded(true)">모두 접기</button>
+            <span class="divider" />
+          </template>
+          <button class="btn btn-sm" :disabled="busy || !canUndo" title="Ctrl+Z" @click="doUndo">되돌리기</button>
+          <button class="btn btn-sm" @click="logOpen = true">변경 기록</button>
+          <button class="btn btn-sm" :disabled="busy" @click="exportExcel">엑셀 내보내기</button>
+          <button class="btn btn-sm" :aria-pressed="panelOpen" @click="panelOpen = !panelOpen">{{ panelOpen ? '패널 닫기' : '패널 열기' }}</button>
         </div>
         <div v-if="errors.length" class="callout callout-danger" role="alert">
           <ul><li v-for="e in errors" :key="e">{{ e }}</li></ul>
@@ -339,6 +350,7 @@ h1 { font-size: var(--text-400); line-height: var(--leading-400); font-weight: v
 .hint { margin: 0; color: var(--color-foreground-normal-100); }
 .toolbar { display: flex; align-items: center; gap: var(--space-050); }
 .toolbar .spacer { flex: 1; }
+.toolbar .divider { width: 1px; height: 16px; background: var(--color-border-normal); margin: 0 var(--space-050); }
 .band-pick {
   position: fixed; z-index: 60; display: grid; gap: var(--space-100); padding: var(--space-150) var(--space-200);
   background: var(--color-background-overlay-100); border: 1px solid var(--color-border-normal);

@@ -24,6 +24,8 @@ def test_매주_프로그램_정리():
     assert p["producer_type"] == "자체"
     assert p["is_special"] is False
     assert p["offweek_policy"] is None
+    assert p["show_episode"] is True
+    assert clean_program(_base(show_episode=False))[0]["show_episode"] is False
 
 
 def test_이름_분야_주기는_필수():

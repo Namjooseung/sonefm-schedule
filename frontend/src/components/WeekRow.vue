@@ -39,7 +39,7 @@ function cellClass(c, day) {
 
 function episodeText(c) {
   if (c.waiting) return '본방 대기'
-  if (c.is_fixed || c.is_special || c.episode == null) return ''
+  if (c.is_fixed || c.is_special || c.show_episode === false || c.episode == null) return ''
   return `${c.episode}화`
 }
 
@@ -53,6 +53,7 @@ function titleText(c, day, h) {
   if (c.actual_change_note) parts.push(`실제 변경: ${c.actual_change_note}`)
   if (c.kind === '본방' && !c.is_fixed) parts.push(`송출 파일 ${c.prep_status}`)
   if (c.manual) parts.push('직접 수정한 칸')
+  if (c.imported) parts.push('엑셀에서 가져온 칸')
   return parts.join(' · ')
 }
 

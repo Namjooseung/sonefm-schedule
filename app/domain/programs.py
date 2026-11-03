@@ -156,6 +156,7 @@ def clean_program(raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
         "host": _text(raw.get("host")),
         "cohort": _text(raw.get("cohort")),
         "is_special": cycle_type == "oneoff",
+        "show_episode": _bool(raw.get("show_episode", True)),
         "memo": (str(raw.get("memo")).strip() or None) if raw.get("memo") else None,
     }
     return program, errors

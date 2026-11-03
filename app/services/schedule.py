@@ -88,6 +88,7 @@ def get_month(conn: sqlite3.Connection, year: int, month: int) -> Result:
         cells[f"{r['date']}|{r['hour']}"] = {
             "program_id": r["program_id"], "name": prog["name"], "category": prog["category"],
             "is_special": prog["is_special"], "is_fixed": r["program_id"] in fixed_ids,
+            "show_episode": prog.get("show_episode", True), "imported": r["source"] == "import",
             "kind": r["kind"], "episode": info.episode if info else None,
             "waiting": bool(info and info.waiting), "missing_warn": (d, r["hour"]) in missing,
             "manual": r["source"] == "manual", "exception_type": r["exception_type"],

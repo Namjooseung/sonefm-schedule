@@ -275,13 +275,14 @@ sonefm-scheduler/
     repository/             -- DB 접근 전담
     domain/                 -- 회차, 주기 판정, 월 생성, 검증, 비율, 집계
     services/               -- 요청 흐름(검증→저장→변경 기록). domain과 repository를 엮음 (P1 추가)
-    io_excel/               -- 엑셀 가져오기/내보내기
+    io_excel/               -- 엑셀 가져오기/내보내기 (reader.py, writer.py)
     backup.py
   frontend/                 -- Vue 3 + Vite
     src/
       views/ScheduleView.vue, ProgramsView.vue, SettingsView.vue
       components/MonthGrid.vue, WeekRow.vue, CellPopup.vue, ValidationPanel.vue,
-                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue, MonthDial.vue, ChangeLogDialog.vue
+                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue, MonthDial.vue, ChangeLogDialog.vue,
+                 ImportWizard.vue
       styles/tokens.css, base.css
       assets/fonts/PretendardVariable.woff2 (OFL-1.1, 빌드 시 HTML에 포함)
       api.js                -- window.pywebview.api 래퍼
@@ -337,6 +338,14 @@ sonefm-scheduler/
 - 내보내기: 현재 쓰는 편성표 엑셀 양식 그대로 (samples/의 실제 파일을 기준으로 맞춘다).
 - 가져오기: 기존 엑셀 편성표를 1회 이관 (별칭 매칭, `_22화` 같은 회차 접미사 처리, 미매칭 이름 목록 표시 후 사용자가 매핑).
 - 완료 조건: 샘플 엑셀을 가져오고 다시 내보냈을 때 원본과 칸 내용이 일치.
+- 구현 결정 (2026-11-03):
+  - 내보내기는 수식 없이 글자만. 주차 머리글은 `M-ISO주차`. 06·22시 고정 편성 줄은 병합해 비움(기존 양식). `프로그램_정보` 시트는 내보내지 않음.
+  - 가져오기는 주의 소속 달 시트에서만, 한 시트에 같은 주가 두 번이면 아래쪽. `#REF!` 등 오류 칸은 건너뛰고 알림.
+  - 기존 엑셀은 본방 자리에 같은 회차를 다시 낼 때 `(재)`를 생략 → 이미 나간 회차가 다시 나오면 재방으로 읽음. 내보낼 때는 `(재)`가 붙음.
+  - 시작 회차는 가장 최근 본방 회차에 맞춤(앞으로의 회차가 엑셀과 같도록). 계산과 다른 재방은 재방 회차 지정. 남는 차이(엑셀 회차 건너뜀 등)는 목록으로 보여줌.
+  - 새로 등록하는 프로그램은 데이터가 있는 마지막 4주로 편성 자리·주기를 추정, 그 4주에 없으면 마지막 방송일로 종영.
+  - 프로그램별 `show_episode`(회차 표시) 추가, 칸 source에 `import`(가져온 칸, 다시 생성해도 유지) 추가 — 마이그레이션 0003.
+  - 샘플 전체 확인 결과: 6,188칸 중 프로그램은 모두 일치, `(재)` 생략 1,021칸, 회차 차이 209칸(2025-12~2026-08에만, 2026-09 이후 0).
 
 ### P7. 백업·설정·데이터 이동
 - 실행 시 날짜별 백업, 보관 개수 정리, 백업 폴더 지정(구글드라이브 등 동기화 폴더 권장).
@@ -353,7 +362,7 @@ sonefm-scheduler/
 
 ## 9. 확인이 필요한 사항 (구현 전/중에 사용자에게 질문)
 
-1. 현재 편성표 엑셀 원본 파일 (P6 내보내기 양식 기준) → `samples/`에 넣기
+1. ~~현재 편성표 엑셀 원본 파일 (P6 내보내기 양식 기준) → `samples/`에 넣기~~ → samples/samples.xlsx (2025-12~2026-11)
 2. 방송국 허가 조건상 주된 방송분야와 편성비율 기준값
 3. 청취자 참여프로그램·타 공동체라디오 제작물에 해당하는 현재 프로그램 목록
 4. 현재 프로그램별 재방 자리(요일·시각) 목록과 시작 회차

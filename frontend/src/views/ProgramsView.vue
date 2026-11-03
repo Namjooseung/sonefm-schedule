@@ -28,7 +28,7 @@ function blank() {
     id: null, name: '', category: '교양', is_listener_participation: false, producer_type: '자체',
     cycle_type: 'weekly', cycle_anchor_date: '', monthly_nth: null, offweek_policy: '',
     start_episode: 1, start_date: today, end_date: null, host: '', cohort: '', memo: '',
-    aliases: [], slots: [], is_special: false,
+    aliases: [], slots: [], is_special: false, show_episode: true,
   }
 }
 
