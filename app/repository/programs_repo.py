@@ -151,3 +151,26 @@ def is_referenced(conn: sqlite3.Connection, program_id: str) -> bool:
         " OR EXISTS (SELECT 1 FROM cancellations WHERE program_id = ?)",
         (program_id, program_id, program_id)).fetchone()
     return bool(row[0])
+
+
+# ── 편성 자리 단건 (칸 팝업의 '이후 전부') ────────
+
+def insert_slot(conn: sqlite3.Connection, program_id: str, weekday: int, hour: int, role: str,
+                valid_from: str, valid_to: str | None) -> str:
+    sid = new_id()
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO program_slots (id, program_id, weekday, hour, role, valid_from, valid_to,"
+        " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid, program_id, weekday, hour, role, valid_from, valid_to, ts, ts))
+    return sid
+
+
+def set_slot_valid_to(conn: sqlite3.Connection, slot_id: str, valid_to: str | None) -> None:
+    conn.execute("UPDATE program_slots SET valid_to = ?, updated_at = ? WHERE id = ?", (valid_to, now_iso(), slot_id))
+
+
+def delete_slot_force(conn: sqlite3.Connection, slot_id: str) -> None:
+    """칸이 참조하고 있으면 참조를 끊고 지운다 (칸은 곧 다시 생성된다)."""
+    conn.execute("UPDATE schedule_cells SET original_slot_id = NULL WHERE original_slot_id = ?", (slot_id,))
+    conn.execute("DELETE FROM program_slots WHERE id = ?", (slot_id,))

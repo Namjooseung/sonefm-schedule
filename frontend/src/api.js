@@ -40,3 +40,17 @@ export const getMonth = (year, month) => call('get_month', year, month)
 /** scope: 'first_week' | 'rest' | 'all' */
 export const generateMonth = (year, month, scope, overwriteManual = false) =>
   call('generate_month', year, month, scope, overwriteManual)
+
+// ── 칸 편집 ── (scope: 'once' 이번만 | 'after' 이후 전부)
+export const getCell = (date, hour) => call('get_cell', date, hour)
+export const cellSetKind = (date, hour, kind, scope = 'once') => call('cell_set_kind', date, hour, kind, scope)
+/** mode: 'rerun' 재방으로 대체 | 'empty' 비워두기 */
+export const cellCancel = (date, hour, mode, reason = '') => call('cell_cancel', date, hour, mode, reason)
+export const cellReplace = (date, hour, programId, kind, scope = 'once') => call('cell_replace', date, hour, programId, kind, scope)
+export const cellSpecial = (date, hour, payload) => call('cell_special', date, hour, payload)
+export const cellOverride = (date, hour, episode) => call('cell_override', date, hour, episode)
+export const cellActual = (date, hour, note) => call('cell_actual', date, hour, note)
+export const cellPrep = (date, hour, status) => call('cell_prep', date, hour, status)
+export const cellRevert = (date, hour) => call('cell_revert', date, hour)
+export const undo = () => call('undo')
+export const listChangeLog = (limit = 200) => call('list_change_log', limit)

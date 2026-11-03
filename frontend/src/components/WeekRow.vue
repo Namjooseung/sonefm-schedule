@@ -10,8 +10,9 @@ const props = defineProps({
   hours: { type: Array, required: true },
   today: { type: String, required: true },
   selected: { type: String, default: '' },
+  folded: { type: Boolean, default: false },   // 접힌 주: 날짜 머리글만 보인다
 })
-const emit = defineEmits(['goto-month', 'select'])
+const emit = defineEmits(['goto-month', 'select', 'toggle', 'band'])
 
 const cellAt = (date, hour) => props.cells[`${date}|${hour}`]
 
@@ -48,13 +49,22 @@ function titleText(c, day, h) {
   const ep = episodeText(c)
   if (ep) parts.push(ep)
   if (c.missing_warn) parts.push('본방 입력 누락?')
+  if (c.exception_type) parts.push(c.exception_type)
+  if (c.actual_change_note) parts.push(`실제 변경: ${c.actual_change_note}`)
+  if (c.kind === '본방' && !c.is_fixed) parts.push(`송출 파일 ${c.prep_status}`)
   if (c.manual) parts.push('직접 수정한 칸')
   return parts.join(' · ')
 }
 
-function onSelect(day, h) {
+function onSelect(day, h, ev) {
   if (props.week.is_reference) return
-  emit('select', `${day.date}|${h}`)
+  emit('select', `${day.date}|${h}`, ev.currentTarget.getBoundingClientRect())
+}
+
+// 고정 편성 띠를 누르면 날짜를 골라 그날만 예외 처리할 수 있게 부모에게 알린다
+function onBand(h, ev) {
+  if (props.week.is_reference) return
+  emit('band', { hour: h, days: props.week.days, rect: ev.currentTarget.getBoundingClientRect() })
 }
 
 const refMonth = computed(() => props.week.days[0].month)
@@ -69,7 +79,10 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
       <button class="link" @click="emit('goto-month', refMonth)">{{ refMonth }}월에서 편집</button>
     </div>
     <div v-if="!collapsed" class="head">
-      <div class="wk"><b>{{ week.label }}</b><span>{{ week.iso_week }}주차</span></div>
+      <button class="wk" :aria-expanded="!folded" :title="folded ? '이 주 펼치기' : '이 주 접기'" @click="emit('toggle')">
+        <svg class="chev" :class="{ folded }" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span class="wk-text"><b>{{ week.label }}</b><span>{{ week.iso_week }}주차</span></span>
+      </button>
       <div
         v-for="(d, i) in week.days" :key="d.date" class="dh"
         :class="{ sat: i === 5, sun: i === 6 || d.holiday, out: !d.in_month && !week.is_reference, today: d.date === today }"
@@ -78,10 +91,10 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
         <em v-if="d.holiday" :title="d.holiday">{{ d.holiday }}</em>
       </div>
     </div>
-    <div v-if="!collapsed" class="grid">
+    <div v-if="!collapsed && !folded" class="grid">
       <template v-for="h in hours" :key="h">
         <div class="hr">{{ String(h).padStart(2, '0') }}</div>
-        <div v-if="bands[h]" class="band" :title="`매일 ${String(h).padStart(2, '0')}:00 고정 편성`">
+        <div v-if="bands[h]" class="band" :title="`매일 ${String(h).padStart(2, '0')}:00 고정 편성 · 눌러서 특정 날만 바꾸기`" @click="onBand(h, $event)">
           <b>{{ bands[h] }}</b><span>매일 {{ String(h).padStart(2, '0') }}:00 · 고정 편성</span>
         </div>
         <template v-else>
@@ -89,10 +102,23 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
             v-for="d in week.days" :key="d.date" class="c"
             :class="[cellClass(cellAt(d.date, h), d), { sel: selected === `${d.date}|${h}` }]"
             :title="titleText(cellAt(d.date, h), d, h)"
-            @click="onSelect(d, h)"
+            @click="onSelect(d, h, $event)"
           >
             <template v-if="cellAt(d.date, h)">
+              <span
+                v-if="cellAt(d.date, h).prep_status !== '미입고' && !cellAt(d.date, h).is_fixed" class="dot"
+                :class="cellAt(d.date, h).prep_status === '입고' ? 'in' : 'done'"
+                :title="`송출 파일 ${cellAt(d.date, h).prep_status}`"
+              />
               <span class="n">{{ cellAt(d.date, h).name }}</span>
+              <svg v-if="cellAt(d.date, h).exception_type" class="ico" viewBox="0 0 24 24" width="14" height="14" :aria-label="cellAt(d.date, h).exception_type">
+                <path v-if="cellAt(d.date, h).exception_type === '교체'" d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path v-else-if="cellAt(d.date, h).exception_type === '특집'" d="M12 4l2.4 5 5.3.6-4 3.6 1.1 5.3L12 15.8 7.2 18.5l1.1-5.3-4-3.6 5.3-.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                <path v-else d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg v-if="cellAt(d.date, h).actual_change_note" class="ico actual" viewBox="0 0 24 24" width="14" height="14" aria-label="실제 변경 있음">
+                <path d="M12 4l9 16H3zM12 10v4M12 17v.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
               <span v-if="cellAt(d.date, h).missing_warn" class="warn">누락?</span>
               <span v-if="cellAt(d.date, h).kind === '재방' && !cellAt(d.date, h).waiting" class="r">재</span>
               <span v-if="episodeText(cellAt(d.date, h))" class="e">{{ episodeText(cellAt(d.date, h)) }}</span>
@@ -119,7 +145,19 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
 }
 .head, .grid { display: grid; grid-template-columns: 52px repeat(7, minmax(0, 1fr)); }
 .head { background: var(--color-background-secondary-100); border-bottom: 1px solid var(--color-border-normal); }
-.wk { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--space-050) 0; }
+.wk {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: var(--space-025);
+  padding: var(--space-050) 0; border: 0; background: transparent; cursor: pointer; color: inherit;
+}
+.wk::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--color-overlay); opacity: 0; transition: opacity var(--motion-fast);
+}
+.wk:hover::before { opacity: var(--overlay-hover-dense); }
+.wk-text { display: flex; flex-direction: column; align-items: center; }
+.chev { flex: none; color: var(--color-foreground-hint-100); transition: transform var(--motion-fast); }
+.chev.folded { transform: rotate(-90deg); }
+.week.ref .wk { cursor: pointer; }
 .wk b { font-size: var(--text-050); line-height: var(--leading-050); font-weight: var(--font-weight-heavy); }
 .wk span { font-size: var(--text-025); line-height: var(--leading-025); color: var(--color-foreground-hint-100); }
 .dh {
@@ -162,6 +200,11 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
   flex: none; font-size: var(--text-025); line-height: 14px; padding: 0 var(--space-050); border-radius: var(--radius-100);
   background: var(--color-background-warning-100); color: var(--color-foreground-warning-200); font-weight: var(--font-weight-bold);
 }
+.c .ico { flex: none; color: var(--color-foreground-normal-100); }
+.c .ico.actual { color: var(--color-foreground-warning-200); }
+.c .dot { flex: none; width: 6px; height: 6px; border-radius: var(--radius-pill); }
+.c .dot.in { background: var(--color-background-success-200); }
+.c .dot.done { background: var(--color-foreground-hint-100); }
 .c.edu.on { background: var(--cell-edu-on); }
 .c.edu.re { background: var(--cell-edu-re); }
 .c.edu::before { background: var(--cell-edu-bar); }
@@ -189,6 +232,13 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
   height: var(--row-height, var(--cell-height)); padding: 0 var(--space-200);
   background: var(--cell-fixed-bg); border-top: 1px solid var(--cell-line); border-left: 1px solid var(--cell-line);
 }
+.band { cursor: pointer; }
+.band::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--color-overlay); opacity: 0; transition: opacity var(--motion-fast);
+}
+.band:hover::after { opacity: var(--overlay-hover-dense); }
+.week.ref .band { cursor: default; }
 .band::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cell-fixed-bar); }
 .band b { font-size: var(--text-100); font-weight: var(--font-weight-heavy); color: var(--color-foreground-normal-100); }
 .band span { font-size: var(--text-050); color: var(--color-foreground-hint-100); }
@@ -202,4 +252,5 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
 .compact .weekrow .band b { font-size: var(--text-075); }
 .compact .weekrow .band span { display: none; }
 .compact .weekrow .hr { font-size: var(--text-025); }
+.compact .weekrow .c .dot { display: none; }
 </style>

@@ -281,7 +281,7 @@ sonefm-scheduler/
     src/
       views/ScheduleView.vue, ProgramsView.vue, SettingsView.vue
       components/MonthGrid.vue, WeekRow.vue, CellPopup.vue, ValidationPanel.vue,
-                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue, MonthDial.vue
+                 ProgramForm.vue, SlotEditor.vue, BaseDialog.vue, MonthDial.vue, ChangeLogDialog.vue
       styles/tokens.css, base.css
       assets/fonts/PretendardVariable.woff2 (OFL-1.1, 빌드 시 HTML에 포함)
       api.js                -- window.pywebview.api 래퍼

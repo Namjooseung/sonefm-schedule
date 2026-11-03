@@ -42,6 +42,8 @@ const fmt = (n) => n.toLocaleString('ko-KR')
       <div><span class="sw fixed" />고정 편성</div>
       <div><span class="sw waiting" />본방 대기</div>
       <div><span class="sw manual" />직접 수정한 칸</div>
+      <div><span class="dotx in" />송출 파일 입고</div>
+      <div><span class="dotx done" />송출 완료</div>
     </div>
   </aside>
 </template>
@@ -77,5 +79,8 @@ h2 { font-size: var(--text-075); font-weight: var(--font-weight-bold); margin-bo
 .sw.special { background: var(--cell-special-bg); } .sw.special::before { background: var(--cell-special-bar); }
 .sw.fixed { background: var(--cell-fixed-bg); } .sw.fixed::before { background: var(--cell-fixed-bar); }
 .sw.waiting { background: var(--cell-waiting-bg); } .sw.waiting::before { background: var(--cell-waiting-bar); }
+.dotx { width: 6px; height: 6px; margin: 0 8px; border-radius: var(--radius-pill); }
+.dotx.in { background: var(--color-background-success-200); }
+.dotx.done { background: var(--color-foreground-hint-100); }
 .sw.manual { box-shadow: inset 0 0 0 1.5px var(--cell-manual-ring); }
 </style>

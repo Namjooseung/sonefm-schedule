@@ -26,3 +26,10 @@ def list_for(conn: sqlite3.Connection, entity: str, entity_id: str) -> list[dict
         "SELECT at, action, before_json, after_json, note FROM change_log"
         " WHERE entity = ? AND entity_id = ? ORDER BY at, rowid", (entity, entity_id)).fetchall()
     return [dict(r) for r in rows]
+
+
+def recent(conn: sqlite3.Connection, limit: int = 200) -> list[dict[str, Any]]:
+    """최근 변경 기록 (최신이 위)."""
+    rows = conn.execute("SELECT at, entity, entity_id, action, note FROM change_log"
+                        " ORDER BY at DESC, rowid DESC LIMIT ?", (limit,))
+    return [dict(r) for r in rows]

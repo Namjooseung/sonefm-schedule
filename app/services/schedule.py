@@ -156,6 +156,7 @@ def generate(conn: sqlite3.Connection, year: int, month: int, scope: str,
     default_offweek = settings_repo.get(conn, "offweek_policy_default", "rerun")
     rule, slot_conflicts = build_rule_cells(dates, schedule_repo.program_rules(conn),
                                             schedule_repo.slot_rules(conn), default_offweek)
+    snap = schedule_repo.snapshot(conn, dates[0], dates[-1], [])   # Ctrl+Z용
     existing = {c.key: c for c in schedule_repo.cells_between(conn, dates[0], dates[-1])}
     cancels = schedule_repo.cancellation_keys(conn, dates[0], dates[-1])
     plan = plan_generation(rule, existing, cancels, overwrite_manual, dates)
@@ -182,6 +183,7 @@ def generate(conn: sqlite3.Connection, year: int, month: int, scope: str,
         # overwrite_manual=False면 아직 안 바뀐 칸, True면 방금 바꾼 칸
         "manual_conflicts": [conflict_row(c) for c in plan.manual_conflicts],
         "overwritten": overwrite_manual,
+        "undo": {"label": f"{month}월 {SCOPES[scope]}", "snapshot": snap} if changed else None,
         "slot_conflicts": [{"date": s.date.isoformat(), "hour": s.hour,
                             "programs": [names.get(p, "?") for p in s.program_ids]} for s in slot_conflicts],
     }

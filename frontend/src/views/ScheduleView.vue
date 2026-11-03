@@ -1,11 +1,14 @@
 <script setup>
 // 편성표 화면: 월 이동 + 버튼(첫 주 불러오기 / 월단위 생성) + 주 줄 그리드 + 오른쪽 패널.
-import { computed, onActivated, onMounted, ref } from 'vue'
+// 칸을 누르면 칸 팝업, 고정 편성 띠를 누르면 날짜 고르기. Ctrl+Z로 이번 실행 중 작업을 되돌린다.
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onBeforeUnmount, ref } from 'vue'
 import * as api from '../api.js'
 import MonthDial from '../components/MonthDial.vue'
 import MonthGrid from '../components/MonthGrid.vue'
 import ValidationPanel from '../components/ValidationPanel.vue'
 import BaseDialog from '../components/BaseDialog.vue'
+import CellPopup from '../components/CellPopup.vue'
+import ChangeLogDialog from '../components/ChangeLogDialog.vue'
 
 const now = new Date()
 const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
@@ -20,6 +23,34 @@ const selected = ref('')
 const slotConflicts = ref([])
 const manualConfirm = ref(null)     // { scope, rows }
 const panelOpen = ref(true)
+const popup = ref(null)             // { key, rect }
+const bandPick = ref(null)          // { hour, days, rect }
+const canUndo = ref(false)
+const logOpen = ref(false)
+
+// 접힌 주 (이 PC에서만 기억, 월요일 날짜 목록)
+const FOLD_KEY = 'sonefm.folded'
+const folded = ref(readFolded())
+function readFolded() {
+  try { return Object.fromEntries(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]').map((m) => [m, true])) } catch { return {} }
+}
+function saveFolded() {
+  try { localStorage.setItem(FOLD_KEY, JSON.stringify(Object.keys(folded.value).slice(-300))) } catch { /* 무시 */ }
+}
+function toggleWeek(monday) {
+  const next = { ...folded.value }
+  if (next[monday]) delete next[monday]; else next[monday] = true
+  folded.value = next
+  saveFolded()
+}
+function setAllFolded(fold) {
+  const next = { ...folded.value }
+  for (const w of [data.value.reference_week, ...data.value.weeks]) {
+    if (fold) next[w.monday] = true; else delete next[w.monday]
+  }
+  folded.value = next
+  saveFolded()
+}
 
 // 보기 밀도 (이 PC에서만 기억)
 const DENSITY_KEY = 'sonefm.density'
@@ -53,12 +84,15 @@ async function load() {
   if (!r.ok) { errors.value = r.errors; return }
   errors.value = []
   data.value = r
+  canUndo.value = !!r.can_undo
 }
 
 async function go(y, m) {
   year.value = y
   month.value = m
   selected.value = ''
+  popup.value = null
+  bandPick.value = null
   slotConflicts.value = []
   notice.value = ''
   await load()
@@ -97,14 +131,60 @@ async function overwriteManual() {
   await generate(scope, true)
 }
 
-function jump(key) {
+async function jump(key) {
+  const day = key.split('|')[0]
+  const week = data.value.weeks.find((w) => w.days.some((d) => d.date === day))
+  if (week && folded.value[week.monday]) toggleWeek(week.monday)
   selected.value = key
+  await nextTick()
   const el = document.querySelector('.c.sel')
   if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
 }
 
-onMounted(load)
-onActivated(() => { if (data.value) load() })   // 프로그램 화면에서 바꾼 내용 반영
+// ── 칸 팝업 ──
+function openCell(key, rect) {
+  bandPick.value = null
+  selected.value = key
+  popup.value = { key, rect }
+}
+function closePopup() { popup.value = null }
+async function onCellChanged(message, undoable) {
+  canUndo.value = !!undoable
+  await load()
+  if (message) flash(message)
+}
+
+// 고정 편성 띠 → 날짜 고르기 → 그 칸 팝업
+function openBand(b) { popup.value = null; bandPick.value = b }
+function pickBandDay(d) {
+  const b = bandPick.value
+  bandPick.value = null
+  openCell(`${d.date}|${b.hour}`, b.rect)
+}
+
+// ── 되돌리기 (Ctrl+Z) ──
+async function doUndo() {
+  if (busy.value) return
+  busy.value = true
+  const r = await api.undo()
+  busy.value = false
+  canUndo.value = !!r.can_undo
+  if (!r.ok) { flash(r.errors[0]); return }
+  popup.value = null
+  await load()
+  flash(r.message)
+}
+function onKey(e) {
+  const t = e.target
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo() }
+}
+function onScroll() { popup.value = null; bandPick.value = null }
+
+onMounted(async () => { window.addEventListener('keydown', onKey); await load() })
+onActivated(() => { window.addEventListener('keydown', onKey); if (data.value) load() })   // 프로그램 화면에서 바꾼 내용 반영
+onDeactivated(() => { window.removeEventListener('keydown', onKey); popup.value = null })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -127,6 +207,8 @@ onActivated(() => { if (data.value) load() })   // 프로그램 화면에서 바
             class="btn" :class="{ 'btn-primary': data && data.first_week_filled }"
             :disabled="busy || !data || data.status === '마감'" @click="generate('rest')"
           >월단위 생성</button>
+          <button class="btn" :disabled="busy || !canUndo" title="Ctrl+Z" @click="doUndo">되돌리기</button>
+          <button class="btn" @click="logOpen = true">변경 기록</button>
           <button class="btn btn-sm panel-toggle" :aria-pressed="panelOpen" @click="panelOpen = !panelOpen">
             {{ panelOpen ? '패널 닫기' : '패널 열기' }}
           </button>
@@ -134,21 +216,39 @@ onActivated(() => { if (data.value) load() })   // 프로그램 화면에서 바
         <MonthDial :year="year" :month="month" :statuses="data?.year_statuses || {}" @select="go" />
       </header>
 
-      <div class="scroll">
+      <div class="scroll" @scroll.passive="onScroll">
+        <div v-if="data && !monthEmpty" class="toolbar">
+          <span class="muted small">칸을 누르면 결방·교체·특집 등을 할 수 있습니다. 주 이름을 누르면 접고 펼칩니다.</span>
+          <span class="spacer" />
+          <button class="btn btn-ghost btn-sm" @click="setAllFolded(false)">모두 펼치기</button>
+          <button class="btn btn-ghost btn-sm" @click="setAllFolded(true)">모두 접기</button>
+        </div>
         <div v-if="errors.length" class="callout callout-danger" role="alert">
           <ul><li v-for="e in errors" :key="e">{{ e }}</li></ul>
         </div>
         <p v-if="monthEmpty" class="hint">
           아직 비어 있는 달입니다. <b>첫 주 불러오기</b>로 첫 주를 채운 뒤 개편 사항을 고치고, <b>월단위 생성</b>으로 나머지 주를 채워 주세요.
         </p>
-        <MonthGrid v-if="data" :data="data" :today="today" :selected="selected"
-                   @goto-month="gotoPrevMonth" @select="(k) => (selected = k)" />
+        <MonthGrid v-if="data" :data="data" :today="today" :selected="selected" :folded="folded"
+                   @goto-month="gotoPrevMonth" @select="openCell" @toggle="toggleWeek" @band="openBand" />
       </div>
     </div>
 
     <ValidationPanel v-if="data && panelOpen" :month="month" :totals="data.totals" :issues="issues" @jump="jump" />
 
     <div v-if="notice" class="toast" role="status">{{ notice }}</div>
+
+    <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" />
+
+    <div v-if="bandPick" class="band-pick" :style="{ left: `${bandPick.rect.left + 120}px`, top: `${Math.min(bandPick.rect.bottom + 4, 9999)}px` }">
+      <p class="small">어느 날만 바꿀까요?</p>
+      <div class="days">
+        <button v-for="d in bandPick.days" :key="d.date" class="btn btn-sm" @click="pickBandDay(d)">{{ d.month }}/{{ d.day }} {{ d.weekday }}</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" @click="bandPick = null">닫기</button>
+    </div>
+
+    <ChangeLogDialog v-if="logOpen" @close="logOpen = false" />
 
     <BaseDialog v-if="manualConfirm" title="직접 수정한 칸이 있습니다" @close="manualConfirm = null">
       <p>아래 칸은 사람이 직접 고친 칸이라 그대로 두었습니다. 규칙대로 덮어쓸까요?</p>
@@ -185,6 +285,15 @@ h1 { font-size: var(--text-400); line-height: var(--leading-400); font-weight: v
 .seg button[aria-pressed="true"] { background: var(--color-background-canvas-100); color: var(--color-foreground-normal-200); box-shadow: var(--shadow-sm); }
 .scroll { flex: 1; overflow: auto; padding: var(--space-200) var(--space-300) var(--space-500); display: grid; gap: var(--space-150); align-content: start; }
 .hint { margin: 0; color: var(--color-foreground-normal-100); }
+.toolbar { display: flex; align-items: center; gap: var(--space-050); }
+.toolbar .spacer { flex: 1; }
+.band-pick {
+  position: fixed; z-index: 60; display: grid; gap: var(--space-100); padding: var(--space-150) var(--space-200);
+  background: var(--color-background-overlay-100); border: 1px solid var(--color-border-normal);
+  border-radius: var(--radius-300); box-shadow: var(--shadow-md);
+}
+.band-pick p { margin: 0; font-weight: var(--font-weight-medium); }
+.band-pick .days { display: flex; gap: var(--space-050); flex-wrap: wrap; }
 .toast {
   position: fixed; left: 50%; bottom: var(--space-300); transform: translateX(-50%); z-index: 50;
   max-width: 400px; padding: var(--space-150) var(--space-200); border-radius: var(--radius-300);
