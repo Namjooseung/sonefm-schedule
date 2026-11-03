@@ -2,6 +2,8 @@
 from app.api import Api
 from app.startup import prepare
 
+FIXED = {"굿모닝!", "굿바이!"}  # 0002 마이그레이션이 넣는 고정 편성 프로그램
+
 
 def _api():
     return Api(prepare().config)
@@ -18,7 +20,7 @@ def test_등록_후_목록에_보임():
                           "cycle_anchor_date": "2026-11-05", "slots": [
                               {"weekday": 3, "hour": 15, "role": "본방", "valid_from": "2026-11-02"}]})
     assert r["ok"], r
-    items = api.list_programs("", False)["items"]
+    items = [p for p in api.list_programs("", False)["items"] if p["name"] not in FIXED]
     assert [p["name"] for p in items] == ["수원은 지금"]
     assert items[0]["cycle_label"] == "격주"
 
@@ -27,7 +29,7 @@ def test_검증_실패는_아무것도_저장하지_않음():
     api = _api()
     r = api.save_program({"name": "", "category": "교양", "cycle_type": "weekly"})
     assert not r["ok"] and r["errors"]
-    assert api.list_programs("", True)["items"] == []
+    assert {p["name"] for p in api.list_programs("", True)["items"]} == FIXED
 
 
 def test_예상못한_오류는_한국어_안내로():

@@ -9,6 +9,11 @@ from app.repository._common import new_id, now_iso
 from app.services import programs as svc
 
 TODAY = "2026-11-03"
+FIXED = {"굿모닝!", "굿바이!"}  # 0002 마이그레이션이 넣는 고정 편성 프로그램
+
+
+def _mine(items):
+    return [p for p in items if p["name"] not in FIXED]
 
 
 @pytest.fixture
@@ -88,12 +93,12 @@ def test_종영_처리와_목록_숨김(conn):
     assert r["program"]["end_date"] == "2026-10-31"
     assert all(s["valid_to"] == "2026-10-31" for s in r["program"]["slots"])
 
-    assert svc.list_programs(conn, include_ended=False, today=TODAY) == []
-    listed = svc.list_programs(conn, include_ended=True, today=TODAY)
+    assert _mine(svc.list_programs(conn, include_ended=False, today=TODAY)) == []
+    listed = _mine(svc.list_programs(conn, include_ended=True, today=TODAY))
     assert listed[0]["is_ended"] and listed[0]["slot_count"] == 2
 
     assert svc.resume_program(conn, p["id"])["ok"]
-    assert svc.list_programs(conn, include_ended=False, today=TODAY)[0]["end_date"] is None
+    assert _mine(svc.list_programs(conn, include_ended=False, today=TODAY))[0]["end_date"] is None
 
 
 def test_종영일_형식_오류(conn):
