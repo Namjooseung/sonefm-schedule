@@ -5,9 +5,9 @@
 
 판정
 1. 칸이 편성 자리에서 나왔으면(original_slot_id) 그 자리의 역할이 본방인지로.
-2. 자리 정보가 없으면(엑셀에서 가져온 칸 등) 같은 프로그램의 직전 본방이 같은 요일·시각이었는지로
-   (휴방 기간처럼 몇 주씩 재방이 이어져도 같은 자리면 본방 자리). 직전 본방이 없으면
-   다음 3주 안에 같은 자리에서 본방이 나오는지로.
+2. 자리 정보가 없으면(엑셀에서 가져온 칸 등) 같은 프로그램이 이전에 같은 요일·시각에서 본방을 낸 적이
+   있는지로 (휴방 기간처럼 몇 주씩 재방이 이어져도, 본방 자리가 둘이어도 본방 자리).
+   이전에 없으면 다음 3주 안에 같은 자리에서 본방이 나오는지로.
 """
 from __future__ import annotations
 
@@ -37,10 +37,8 @@ def rerun_marks(cells: Iterable[Cell], slot_roles: dict[str, str]) -> dict[tuple
         same_pos = lambda o: o.date.weekday() == c.date.weekday() and o.hour == c.hour  # noqa: E731
         history = ons.get(c.program_id, [])
         prev = [o for o in history if o.key < c.key]
-        if prev:
-            main = same_pos(prev[-1])
-        else:
-            limit = c.date + timedelta(weeks=NEARBY_WEEKS)
-            main = any(same_pos(o) for o in history if c.key < o.key and o.date <= limit)
+        limit = c.date + timedelta(weeks=NEARBY_WEEKS)
+        main = any(same_pos(o) for o in prev) or any(
+            same_pos(o) for o in history if c.key < o.key and o.date <= limit)
         out[c.key] = not main
     return out

@@ -116,3 +116,26 @@ def test_본방_회차를_지정하면_다음_본방이_거기서_이어짐():
 def test_본방_회차를_내려도_다음_본방이_이어짐():
     cells = [cell("2026-11-03", 11, "p"), cell("2026-11-10", 11, "p", override=20), cell("2026-11-17", 11, "p")]
     assert _eps(cells, 23) == {("2026-11-03", 11): 23, ("2026-11-10", 11): 20, ("2026-11-17", 11): 21}
+
+
+# ── 회차 − / + 버튼: 본방 자리 칸은 직전 회차와 비교해 칸 종류까지 정한다 ──
+
+def test_직전_회차():
+    from app.domain.episodes import previous_episode
+    cells = [cell("2026-11-03", 11, "p"), cell("2026-11-07", 18, "p", "재방"), cell("2026-11-10", 11, "p")]
+    assert previous_episode(cells, 41, (D("2026-11-10"), 11)) == 41
+    assert previous_episode(cells, 41, (D("2026-11-03"), 11)) == 40      # 앱 이전에 40화까지
+    assert previous_episode(cells, 1, (D("2026-11-03"), 11)) == 0        # 신규
+
+
+def test_본방_자리_회차_변경():
+    from app.domain.episodes import plan_episode_change as plan
+    assert plan(42, 41, True) == ("본방", None)      # 직전+1: 자동 계산과 같음
+    assert plan(45, 41, True) == ("본방", 45)        # 건너뛰기: 다음 본방은 46
+    assert plan(41, 41, True) == ("재방", None)      # 새 회차 없음
+    assert plan(30, 41, True) == ("재방", 30)        # 앙코르
+
+
+def test_재방_자리는_그_칸만():
+    from app.domain.episodes import plan_episode_change as plan
+    assert plan(45, 41, False) == ("재방", 45)

@@ -46,6 +46,34 @@ def compute_episodes(cells: Iterable[Cell], start_episode: int) -> list[EpisodeI
     return out
 
 
+def previous_episode(cells: Iterable[Cell], start_episode: int, key: tuple[date, int]) -> int:
+    """key 칸 직전까지 나간 마지막 본방 회차. 없으면 시작 회차 - 1 (신규면 0)."""
+    before = sorted((c for c in cells if c.key < key), key=lambda c: c.key)
+    last = start_episode - 1
+    for c, info in zip(before, compute_episodes(before, start_episode)):
+        if c.kind == "본방" and info.episode is not None:
+            last = info.episode
+    return last
+
+
+def plan_episode_change(value: int, previous: int, in_main_slot: bool) -> tuple[str, int | None]:
+    """회차 − / + 버튼의 결과: (칸 종류, 수동 지정 회차).
+
+    본방 자리 칸은 직전 회차와 비교해 칸 종류까지 정한다 (비정기도 같다).
+    - 직전보다 크면 새 회차 = 본방. 직전+1이면 자동 계산과 같으므로 지정하지 않는다.
+    - 직전과 같으면 그날은 새 회차 없음 = 재방. 다음 본방이 이 회차를 이어받는다.
+    - 직전보다 작으면 예전 회차를 다시 내는 재방 (그 칸만).
+    재방 자리 칸은 언제나 재방이고 그 칸만 바뀐다.
+    """
+    if not in_main_slot:
+        return "재방", value
+    if value > previous:
+        return "본방", None if value == previous + 1 else value
+    if value == previous:
+        return "재방", None
+    return "재방", value
+
+
 def episodes_by_program(
     cells: Iterable[Cell], start_episodes: dict[str, int]
 ) -> dict[tuple[date, int], EpisodeInfo]:

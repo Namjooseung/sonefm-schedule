@@ -14,13 +14,14 @@ from datetime import date
 from typing import Any
 
 from app.domain import programs as program_rules
+from app.domain.episodes import plan_episode_change, previous_episode
 from app.domain.generate import build_rule_cells, plan_generation
 from app.domain.models import HOURS, Cell
 from app.domain.slot_change import plan_from_date
 from app.domain.weeks import month_of_week
 from app.repository import change_log_repo, programs_repo, schedule_repo, settings_repo
 from app.services import programs as program_service
-from app.services.schedule import _episode_map
+from app.services.schedule import _episode_map, rerun_mark_map
 
 Result = dict[str, Any]
 KINDS = ("본방", "재방")
@@ -346,7 +347,8 @@ def put_special(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, payload: di
 def set_override(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, episode: Any) -> Result:
     """회차 지정 (− / + 버튼). episode가 비면 지정 해제(자동 계산으로).
 
-    본방이면 다음 본방이 여기서 이어지고, 재방이면 그 칸만 바뀐다.
+    본방 자리 칸은 직전 회차와 비교해 본방/재방까지 정한다 (domain.episodes.plan_episode_change).
+    재방 자리 칸은 그 칸만 바뀐다.
     """
     parsed = _parse(d_raw, hour_raw)
     if parsed is None:
@@ -365,10 +367,20 @@ def set_override(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, episode: A
             return _fail("회차는 1 이상의 정수로 입력해 주세요.")
     name = _names(conn).get(row["program_id"], "?")
 
+    kind, override = row["kind"], None
+    if ep is not None:
+        in_main = row["kind"] == "본방" or not rerun_mark_map(conn, d, d).get((d, hour), True)
+        rule = schedule_repo.program_rules(conn).get(row["program_id"])
+        mine = [c for c in schedule_repo.cells_until(conn, d) if c.program_id == row["program_id"]]
+        previous = previous_episode(mine, rule.start_episode if rule else 1, (d, hour))
+        kind, override = plan_episode_change(ep, previous, in_main)
+
     def fn() -> str:
-        schedule_repo.update_cell(conn, d, hour, rerun_episode_override=ep, source="manual")
-        return f"{_label(d, hour)} {name} {row['kind']} 회차 " + (f"{ep}화로 지정" if ep else "자동 계산으로")
-    return _run_edit(conn, d, hour, "회차 지정", fn, affects_episodes=row["kind"] == "본방")
+        schedule_repo.update_cell(conn, d, hour, kind=kind, rerun_episode_override=override, source="manual")
+        if ep is None:
+            return f"{_label(d, hour)} {name} 회차 자동 계산으로"
+        return f"{_label(d, hour)} {name} {ep}화 ({'새 회차' if kind == '본방' else '재방'})"
+    return _run_edit(conn, d, hour, "회차 지정", fn, affects_episodes="본방" in (kind, row["kind"]))
 
 
 def set_actual(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, note: str | None) -> Result:

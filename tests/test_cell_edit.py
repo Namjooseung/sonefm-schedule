@@ -206,3 +206,60 @@ def test_빈칸은_회차_지정_불가(api):
 
 def test_칸_정보에_회차표시_여부(api):
     assert api.get_cell("2026-11-10", 11)["cell"]["show_episode"] is True
+
+
+def test_회차를_내려_직전과_같아지면_새_회차가_아님(api):
+    assert cell(api, "2026-11-10", 11)["kind"] == "본방"
+    assert api.cell_override("2026-11-10", 11, 41)["ok"]     # 42 → 41 (직전 회차)
+    c = cell(api, "2026-11-10", 11)
+    assert c["kind"] == "재방" and c["episode"] == 41
+    assert ep(api, "2026-11-17", 11) == 42                   # 다음 본방이 이어받음
+    assert api.cell_override("2026-11-10", 11, 42)["ok"]     # 다시 올리면 새 회차
+    c = cell(api, "2026-11-10", 11)
+    assert c["kind"] == "본방" and c["episode"] == 42
+    assert ep(api, "2026-11-17", 11) == 43
+
+
+def test_비정기도_회차를_올리면_새_회차(api):
+    assert cell(api, "2026-11-13", 15)["kind"] == "재방"
+    assert api.cell_override("2026-11-13", 15, 5)["ok"]      # 4 → 5
+    assert cell(api, "2026-11-13", 15)["kind"] == "본방"
+    assert ep(api, "2026-11-20", 15) == 5                    # 뒤 재방이 새 회차를 따라감
+    assert api.cell_override("2026-11-13", 15, 4)["ok"]      # 그날 안 하면 내림
+    assert cell(api, "2026-11-13", 15)["kind"] == "재방"
+    assert ep(api, "2026-11-20", 15) == 4
+
+
+def test_직전보다_낮추면_그_칸만_재방(api):
+    assert api.cell_override("2026-11-10", 11, 30)["ok"]
+    c = cell(api, "2026-11-10", 11)
+    assert c["kind"] == "재방" and c["episode"] == 30
+    assert ep(api, "2026-11-17", 11) == 42
+
+
+def test_재방_자리는_올려도_본방이_안됨(api):
+    assert api.cell_override("2026-11-07", 18, 50)["ok"]
+    c = cell(api, "2026-11-07", 18)
+    assert c["kind"] == "재방" and c["episode"] == 50
+    assert ep(api, "2026-11-10", 11) == 42
+
+
+def test_본방_자리가_둘인_프로그램도_내렸다_올릴_수_있음():
+    a = Api(prepare().config)
+    r = a.save_program({"name": "그 사이 음악", "category": "오락", "cycle_type": "weekly", "start_episode": 80, "slots": []})
+    pid = r["program"]["id"]
+    # 엑셀에서 가져온 칸처럼 자리 정보가 없는 본방: 화·목
+    from app.db.connection import open_db
+    from app.repository._common import new_id, now_iso
+    with open_db(a._cfg.db_path) as conn:
+        ts = now_iso()
+        for d in ("2026-11-03", "2026-11-05", "2026-11-10", "2026-11-12"):
+            conn.execute("INSERT INTO schedule_cells (id, date, hour, program_id, kind, source, created_at, updated_at)"
+                         " VALUES (?, ?, 13, ?, '본방', 'import', ?, ?)", (new_id(), d, pid, ts, ts))
+        conn.execute("INSERT INTO month_plans (id, year_month, status, created_at, updated_at)"
+                     " VALUES (?, '2026-11', '작성중', ?, ?)", (new_id(), ts, ts))
+    assert a.cell_override("2026-11-12", 13, 82)["ok"]       # 83 → 82 (직전과 같음)
+    c = a.get_month(2026, 11)["cells"]["2026-11-12|13"]
+    assert c["kind"] == "재방" and c["rerun_mark"] is False   # 본방 자리 그대로
+    assert a.cell_override("2026-11-12", 13, 83)["ok"]       # 다시 올리면 새 회차
+    assert a.get_month(2026, 11)["cells"]["2026-11-12|13"]["kind"] == "본방"
