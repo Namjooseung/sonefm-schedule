@@ -230,8 +230,9 @@ def run_import(conn: sqlite3.Connection, path: str, titles: list[str], mapping: 
 
     # 기존 엑셀은 본방 자리에 같은 회차를 다시 낼 때 (재)를 안 붙였다 (예: 75화 → 75화 → 76화).
     # 프로그램별 날짜순으로 보아 이미 나간 회차가 다시 나오면 재방으로 읽는다.
+    # 이어서 가져올 때는 DB에 이미 있는 본방 회차도 본다.
     kinds: dict[Key, str] = {}
-    last_on: dict[str, int] = {}
+    last_on: dict[str, int] = _last_aired(conn, min(k[0] for k in cells))
     as_rerun = 0
     for key, (p, _t, _c) in sorted(cells.items()):
         if p is None or p.name not in resolved:
@@ -328,6 +329,19 @@ def _infer_new(conn, created: list[str], resolved: dict[str, str], cells, kinds:
                                                "valid_from": mondays[0].isoformat(), "valid_to": None} for s_ in g.slots])
         inferred += 1
     return inferred, ended
+
+
+def _last_aired(conn: sqlite3.Connection, before: date) -> dict[str, int]:
+    """before 이전에 DB에 있는 프로그램별 마지막 본방 회차."""
+    starts = schedule_repo.program_rules(conn)
+    out: dict[str, int] = {}
+    for pid, cells in _cells_by_program(conn).items():
+        start = starts[pid].start_episode if pid in starts else 1
+        eps = [i.episode for c, i in zip(cells, compute_episodes(cells, start))
+               if c.kind == "본방" and c.date < before and i.episode is not None]
+        if eps:
+            out[pid] = max(eps)
+    return out
 
 
 def _cells_by_program(conn: sqlite3.Connection) -> dict[str, list]:

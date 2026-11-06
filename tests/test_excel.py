@@ -142,3 +142,27 @@ def test_괄호_재_생략된_격주는_격주로_추정(conn, tmp_path):
     assert r["ok"] and r["read_as_rerun"] == 2
     p = program_svc.get_program(conn, program_svc.list_programs(conn, "수원은 지금", True)[0]["id"])["program"]
     assert p["cycle_type"] == "biweekly" and p["cycle_anchor_date"] == "2026-08-18"   # 마지막 본방 (8/4와 같은 격주 박자)
+
+
+def _one_week_file(path, sheet, monday, label, text):
+    from datetime import date, timedelta
+    from app.io_excel.writer import MonthSheet, WeekBlock, write_months
+    wk = WeekBlock(label=label, days=[(monday + timedelta(days=k)).day for k in range(7)])
+    wk.rows[10] = [(text if k == 1 else "", False) for k in range(7)]
+    write_months([MonthSheet(sheet, date(monday.year, monday.month, 1), [wk])], path)
+
+
+def test_이어서_가져올_때_DB의_직전_회차까지_보고_재방으로_읽음(conn, tmp_path):
+    from datetime import date
+    a, b, c = tmp_path / "a.xlsx", tmp_path / "b.xlsx", tmp_path / "c.xlsx"
+    _one_week_file(a, "2608", date(2026, 8, 24), "8-35", "수원은 지금_72화")
+    _one_week_file(b, "2609", date(2026, 9, 7), "9-37", "수원은 지금_72화")     # (재) 없이 같은 회차
+    _one_week_file(c, "2609", date(2026, 9, 14), "9-38", "수원은 지금_73화")
+    assert svc.run_import(conn, str(a), ["2608"], {"수원은 지금": {"action": "new"}})["ok"]
+    r = svc.run_import(conn, str(b), ["2609"], {})
+    assert r["ok"] and r["read_as_rerun"] == 1
+    kind = conn.execute("SELECT kind FROM schedule_cells WHERE date = '2026-09-08' AND hour = 10").fetchone()[0]
+    assert kind == "재방"
+    r = svc.run_import(conn, str(c), ["2609"], {}, overwrite=False)
+    assert r["ok"] and r["read_as_rerun"] == 0
+    assert conn.execute("SELECT kind FROM schedule_cells WHERE date = '2026-09-15' AND hour = 10").fetchone()[0] == "본방"
