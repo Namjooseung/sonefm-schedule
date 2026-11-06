@@ -181,6 +181,7 @@ def get_cell(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:
                                    "rerun_episode_override", "prep_status", "actual_change_note", "updated_at")},
             "name": p.get("name", "?"), "category": p.get("category"), "is_special": p.get("is_special", False),
             "cycle_type": p.get("cycle_type"), "is_fixed": row["program_id"] in fixed,
+            "show_episode": p.get("show_episode", True),
             "episode": info.episode if info else None, "waiting": bool(info and info.waiting),
             "original_name": display.get(row["original_program_id"], {}).get("name") if row["original_program_id"] else None,
         }
@@ -343,14 +344,17 @@ def put_special(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, payload: di
 
 
 def set_override(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, episode: Any) -> Result:
-    """재방 회차 지정. episode가 비면 지정 해제(자동 계산으로)."""
+    """회차 지정 (− / + 버튼). episode가 비면 지정 해제(자동 계산으로).
+
+    본방이면 다음 본방이 여기서 이어지고, 재방이면 그 칸만 바뀐다.
+    """
     parsed = _parse(d_raw, hour_raw)
     if parsed is None:
         return _fail("요청이 올바르지 않습니다.")
     d, hour = parsed
     row = schedule_repo.get_cell_row(conn, d, hour)
-    if row is None or row["kind"] != "재방":
-        return _fail("재방 칸에서만 회차를 지정할 수 있습니다.")
+    if row is None:
+        return _fail("빈칸에는 회차를 지정할 수 없습니다.")
     ep: int | None = None
     if episode not in (None, ""):
         try:
@@ -363,8 +367,8 @@ def set_override(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, episode: A
 
     def fn() -> str:
         schedule_repo.update_cell(conn, d, hour, rerun_episode_override=ep, source="manual")
-        return f"{_label(d, hour)} {name} 재방 회차 " + (f"{ep}화로 지정" if ep else "자동 계산으로")
-    return _run_edit(conn, d, hour, "재방 회차 지정", fn, affects_episodes=False)
+        return f"{_label(d, hour)} {name} {row['kind']} 회차 " + (f"{ep}화로 지정" if ep else "자동 계산으로")
+    return _run_edit(conn, d, hour, "회차 지정", fn, affects_episodes=row["kind"] == "본방")
 
 
 def set_actual(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, note: str | None) -> Result:

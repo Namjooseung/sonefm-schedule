@@ -3,7 +3,8 @@
 규칙
 - 본방 회차 = 시작 회차 + 그 시점 이전까지 실제로 나간 본방 횟수.
   결방은 칸이 없으니 세지 않는다 → 다음 본방이 그 회차를 이어받는다.
-- 재방 회차 = 수동 지정이 있으면 그 값, 없으면 그 시점 직전 본방의 회차.
+- 본방 회차를 수동 지정하면 그 칸이 그 회차가 되고, 다음 본방은 거기서 1씩 이어진다.
+- 재방 회차 = 수동 지정이 있으면 그 값(그 칸만), 없으면 그 시점 직전 본방의 회차.
 - 앱 안에 아직 본방이 없을 때의 재방:
   - 시작 회차 N > 1 이면 앱 이전에 N-1화까지 나간 것으로 보고 N-1화.
   - 시작 회차 1(신규)이면 회차 없음 → '본방 대기'.
@@ -29,13 +30,13 @@ def compute_episodes(cells: Iterable[Cell], start_episode: int) -> list[EpisodeI
     돌려주는 목록은 시간순 정렬 결과와 같은 순서다.
     """
     ordered = sorted(cells, key=lambda c: c.key)
-    aired = 0
+    next_ep = start_episode
     last: int | None = start_episode - 1 if start_episode > 1 else None
     out: list[EpisodeInfo] = []
     for c in ordered:
         if c.kind == "본방":
-            ep = start_episode + aired
-            aired += 1
+            ep = c.rerun_episode_override if c.rerun_episode_override is not None else next_ep
+            next_ep = ep + 1
             last = ep
             out.append(EpisodeInfo(ep))
         elif c.rerun_episode_override is not None:

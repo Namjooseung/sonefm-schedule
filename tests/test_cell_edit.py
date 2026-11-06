@@ -107,7 +107,6 @@ def test_정규_재방으로_이후_전부(api):
 def test_재방_회차_지정과_해제(api):
     assert api.cell_override("2026-11-07", 18, 30)["ok"]
     assert ep(api, "2026-11-07", 18) == 30
-    assert not api.cell_override("2026-11-03", 11, 3)["ok"]   # 본방 칸은 불가
     assert not api.cell_override("2026-11-07", 18, "abc")["ok"]
     assert api.cell_override("2026-11-07", 18, "")["ok"]
     assert ep(api, "2026-11-07", 18) == 41
@@ -179,3 +178,31 @@ def test_빈칸_채우기(api):
     assert r["ok"]
     c = cell(api, "2026-11-02", 9)
     assert c["name"] == "그 삶이다" and c["exception_type"] is None and c["manual"]
+
+
+def test_본방_회차_올리고_내리기(api):
+    assert ep(api, "2026-11-10", 11) == 42
+    r = api.cell_override("2026-11-10", 11, 45)
+    assert r["ok"], r
+    assert ep(api, "2026-11-03", 11) == 41                 # 이전은 그대로
+    assert ep(api, "2026-11-10", 11) == 45
+    assert ep(api, "2026-11-14", 18) == 45                 # 재방은 직전 본방을 따라감
+    assert ep(api, "2026-11-17", 11) == 46                 # 다음 본방이 이어짐
+    assert api.get_cell("2026-11-10", 11)["cell"]["rerun_episode_override"] == 45
+    assert api.undo()["ok"]
+    assert ep(api, "2026-11-17", 11) == 43
+    api.cell_override("2026-11-10", 11, 45)
+    assert api.cell_override("2026-11-10", 11, "")["ok"]    # 자동으로
+    assert ep(api, "2026-11-17", 11) == 43
+
+
+def test_회차는_1보다_작게_못함(api):
+    assert not api.cell_override("2026-11-10", 11, 0)["ok"]
+
+
+def test_빈칸은_회차_지정_불가(api):
+    assert not api.cell_override("2026-11-02", 9, 3)["ok"]
+
+
+def test_칸_정보에_회차표시_여부(api):
+    assert api.get_cell("2026-11-10", 11)["cell"]["show_episode"] is True

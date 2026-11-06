@@ -26,6 +26,7 @@ const panelOpen = ref(true)
 const popup = ref(null)             // { key, rect }
 const bandPick = ref(null)          // { hour, days, rect }
 const canUndo = ref(false)
+const refOpen = ref(false)          // 참고 줄(전달 마지막 주): 달을 열 때마다 접힌 상태
 const logOpen = ref(false)
 
 // 접힌 주 (이 PC에서만 기억, 월요일 날짜 목록)
@@ -45,7 +46,8 @@ function toggleWeek(monday) {
 }
 function setAllFolded(fold) {
   const next = { ...folded.value }
-  for (const w of [data.value.reference_week, ...data.value.weeks]) {
+  refOpen.value = !fold
+  for (const w of data.value.weeks) {
     if (fold) next[w.monday] = true; else delete next[w.monday]
   }
   folded.value = next
@@ -115,6 +117,7 @@ async function go(y, m) {
   selected.value = ''
   popup.value = null
   bandPick.value = null
+  refOpen.value = false
   notice.value = ''
   await load()
 }
@@ -181,6 +184,13 @@ async function onCellChanged(message, undoable, warnings = []) {
   await load()
   if (warnings.length) flash(`${message} — ${warnings.join(' ')}`, true)
   else if (message) flash(message)
+}
+
+// 팝업이 닫히면서 저장한 회차 변경의 결과 받기
+async function onCellPending(promise) {
+  const r = await promise
+  if (r.ok) onCellChanged(r.message, r.can_undo, r.warnings || [])
+  else flash(r.errors[0], true)
 }
 
 // 고정 편성 띠 → 날짜 고르기 → 그 칸 팝업
@@ -280,8 +290,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p v-if="monthEmpty" class="hint">
           아직 비어 있는 달입니다. <b>첫 주 불러오기</b>로 첫 주를 채운 뒤 개편 사항을 고치고, <b>월단위 생성</b>으로 나머지 주를 채워 주세요.
         </p>
-        <MonthGrid v-if="data" :data="data" :today="today" :selected="selected" :folded="folded"
-                   @goto-month="gotoPrevMonth" @select="openCell" @toggle="toggleWeek" @band="openBand" />
+        <MonthGrid v-if="data" :data="data" :today="today" :selected="selected" :folded="folded" :ref-open="refOpen"
+                   @goto-month="gotoPrevMonth" @select="openCell" @toggle="toggleWeek" @toggle-ref="refOpen = !refOpen" @band="openBand" />
       </div>
     </div>
 
@@ -301,7 +311,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
     <div v-if="notice" class="toast" :class="{ warn: noticeWarn }" role="status">{{ notice }}</div>
 
-    <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" />
+    <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" @pending="onCellPending" />
 
     <div v-if="bandPick" class="band-pick" :style="{ left: `${bandPick.rect.left + 120}px`, top: `${Math.min(bandPick.rect.bottom + 4, 9999)}px` }">
       <p class="small">어느 날만 바꿀까요?</p>

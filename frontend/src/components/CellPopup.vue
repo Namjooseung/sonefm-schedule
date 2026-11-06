@@ -8,7 +8,7 @@ const props = defineProps({
   cellKey: { type: String, required: true },     // 'YYYY-MM-DD|시'
   anchor: { type: Object, required: true },      // 칸의 화면 위치 (DOMRect)
 })
-const emit = defineEmits(['close', 'changed'])
+const emit = defineEmits(['close', 'changed', 'pending'])
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const date = computed(() => props.cellKey.split('|')[0])
@@ -20,7 +20,7 @@ const when = computed(() => {
 
 const info = ref(null)
 const programs = ref([])
-const mode = ref('')           // '' | kind | cancel | replace | special | override | actual
+const mode = ref('')           // '' | kind | cancel | replace | special | actual
 const errors = ref([])
 const busy = ref(false)
 const el = ref(null)
@@ -52,7 +52,13 @@ async function place() {
   pos.value = { left, top }
 }
 
-watch(() => props.cellKey, async () => { reset(); info.value = null; await load(); place() })
+watch(() => props.cellKey, async (_new, old) => {
+  flushStep(old)
+  reset()
+  info.value = null
+  await load()
+  place()
+})
 watch([info, mode], place)
 
 function reset() { mode.value = ''; errors.value = []; pendingKind.value = '' }
@@ -61,10 +67,10 @@ async function run(promise, keepOpen = false) {
   busy.value = true
   errors.value = []
   const r = await promise
-  busy.value = false
-  if (!r.ok) { errors.value = r.errors; return }
+  if (!r.ok) { busy.value = false; errors.value = r.errors; await load(); return }
   emit('changed', r.message, r.can_undo, r.warnings || [])
   if (keepOpen) { reset(); await load() } else emit('close')
+  busy.value = false
 }
 
 // ── 본방/재방 ──
@@ -105,8 +111,32 @@ function submitSpecial() {
 }
 
 // ── 재방 회차 / 실제 변경 ──
-const overrideEp = ref('')
-function openOverride() { mode.value = 'override'; overrideEp.value = cell.value?.rerun_episode_override ?? '' }
+// 회차 − / + : 본방은 다음 본방이 여기서 이어지고, 재방은 그 칸만 바뀐다
+const canStep = computed(() => {
+  const c = cell.value
+  return c && !c.is_fixed && !c.is_special && c.show_episode !== false
+})
+// 숫자는 누르는 즉시 바꾸고, 연달아 누르면 멈춘 뒤 한 번만 저장한다 (Ctrl+Z도 한 번에 되돌아감)
+const STEP_DELAY = 350
+let stepTimer = 0
+let stepValue = null
+function stepEpisode(delta) {
+  const c = cell.value
+  const next = (c.episode ?? 0) + delta
+  if (next < 1) return
+  c.episode = next
+  c.rerun_episode_override = next
+  c.waiting = false
+  stepValue = next
+  clearTimeout(stepTimer)
+  stepTimer = setTimeout(saveStep, STEP_DELAY)
+}
+function saveStep() {
+  clearTimeout(stepTimer)
+  const v = stepValue
+  stepValue = null
+  if (v != null) run(api.cellOverride(date.value, hour.value, v), true)
+}
 const actualNote = ref('')
 function openActual() { mode.value = 'actual'; actualNote.value = cell.value?.actual_change_note || '' }
 
@@ -119,7 +149,7 @@ const episodeText = computed(() => {
   const c = cell.value
   if (!c) return ''
   if (c.waiting) return '본방 대기'
-  if (c.is_fixed || c.is_special || c.episode == null) return ''
+  if (c.is_fixed || c.is_special || c.show_episode === false || c.episode == null) return ''
   return `${c.episode}화${c.rerun_episode_override ? ' (지정)' : ''}`
 })
 
@@ -141,7 +171,16 @@ onMounted(async () => {
   await load()
   place()
 })
+// 저장 전에 팝업을 닫거나 다른 칸을 누르면 그 값을 바로 저장한다 (결과는 부모가 받아 화면을 새로 고침)
+function flushStep(key) {
+  if (stepValue == null) return
+  clearTimeout(stepTimer)
+  const [d, h] = key.split('|')
+  emit('pending', api.cellOverride(d, Number(h), stepValue))
+  stepValue = null
+}
 onBeforeUnmount(() => {
+  flushStep(props.cellKey)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('mousedown', onDown)
 })
@@ -242,17 +281,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- 재방 회차 지정 -->
-      <div v-else-if="mode === 'override'" class="sub">
-        <div class="row">
-          <input v-model="overrideEp" type="number" min="1" class="input input-sm ep" placeholder="회차" />
-          <span class="small">화</span>
-          <button class="btn btn-primary btn-sm" :disabled="busy" @click="run(api.cellOverride(date, hour, overrideEp), true)">지정</button>
-          <button class="btn btn-sm" :disabled="busy" @click="run(api.cellOverride(date, hour, ''), true)">자동으로</button>
-        </div>
-        <p class="muted small">특집 재방·앙코르처럼 직전 본방이 아닌 회차를 내보낼 때 씁니다.</p>
-      </div>
-
       <!-- 실제 변경 -->
       <div v-else-if="mode === 'actual'" class="sub">
         <textarea v-model="actualNote" class="textarea small" rows="2" placeholder="예: 송출 사고로 다른 음원으로 대체" />
@@ -266,10 +294,22 @@ onBeforeUnmount(() => {
       <!-- 동작 목록 -->
       <ul v-else class="actions">
         <template v-if="cell">
+          <li v-if="canStep" class="stepper">
+            <span>회차</span>
+            <div class="step">
+              <button class="sq" aria-label="회차 내리기" :disabled="(cell.episode ?? 0) <= 1" @click="stepEpisode(-1)">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              </button>
+              <b>{{ cell.episode != null ? `${cell.episode}화` : '—' }}</b>
+              <button class="sq" aria-label="회차 올리기" @click="stepEpisode(1)">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 6v12M6 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              </button>
+              <button v-if="cell.rerun_episode_override" class="btn btn-ghost btn-sm" :disabled="busy" @click="run(api.cellOverride(date, hour, ''), true)">자동</button>
+            </div>
+          </li>
           <li><button @click="openReplace">다른 프로그램으로 교체 <span>{{ info.scope_available ? '이번만 / 이후 전부' : '이번만' }}</span></button></li>
           <li><button @click="openSpecial">특집 넣기</button></li>
           <li><button @click="mode = 'cancel'; cancelReason = ''">결방 <span>재방 대체 / 비우기</span></button></li>
-          <li v-if="cell.kind === '재방'"><button @click="openOverride">재방 회차 지정 <span>{{ cell.rerun_episode_override ? `${cell.rerun_episode_override}화` : '자동' }}</span></button></li>
           <li><button @click="openActual">실제 변경 기록 <span>사고·긴급 결방</span></button></li>
           <li class="prep">
             <span>송출 파일</span>
@@ -318,7 +358,6 @@ header { padding: var(--space-150) var(--space-200); border-bottom: 1px solid va
 .sub { display: grid; gap: var(--space-100); padding: var(--space-150) var(--space-200); }
 .sub p { margin: 0; }
 .row { display: flex; gap: var(--space-075); align-items: center; flex-wrap: wrap; }
-.ep { width: 80px; }
 .choices { list-style: none; margin: 0; padding: var(--space-050); max-height: 200px; overflow: auto; border-radius: var(--radius-300); box-shadow: inset 0 0 0 1px var(--color-border-normal); }
 .choices button {
   display: flex; justify-content: space-between; gap: var(--space-100); width: 100%; text-align: left;
@@ -340,6 +379,20 @@ header { padding: var(--space-150) var(--space-200); border-bottom: 1px solid va
 .actions li > button:hover::before { opacity: var(--overlay-hover); }
 .actions li > button span { font-size: var(--text-050); color: var(--color-foreground-hint-100); }
 .actions li.danger > button { color: var(--color-foreground-danger-100); }
+.stepper { display: flex; align-items: center; justify-content: space-between; gap: var(--space-100); padding: var(--space-050) var(--space-100); }
+.step { display: flex; align-items: center; gap: var(--space-075); }
+.step b { min-width: 48px; text-align: center; font-weight: var(--font-weight-bold); }
+.sq {
+  position: relative; display: grid; place-items: center; width: var(--control-sm); height: var(--control-sm); padding: 0;
+  border: 0; border-radius: var(--radius-300); cursor: pointer; color: var(--color-foreground-normal-200);
+  background: var(--color-background-canvas-100); box-shadow: inset 0 0 0 1px var(--color-border-secondary);
+}
+.sq::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--color-overlay); opacity: 0; transition: opacity var(--motion-fast);
+}
+.sq:hover::before { opacity: var(--overlay-hover); }
+.sq:disabled { opacity: var(--disabled-opacity); cursor: default; }
 .prep { display: flex; align-items: center; justify-content: space-between; gap: var(--space-100); padding: var(--space-050) var(--space-100); }
 .seg-sm { display: flex; gap: var(--space-050); }
 .seg-sm button { height: var(--control-sm); padding: 0 var(--space-075); font-size: var(--text-050); }
