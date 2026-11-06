@@ -32,9 +32,15 @@ function cellClass(c, day) {
   if (!c) return ['empty', { out: !day.in_month && !props.week.is_reference }]
   return [
     c.is_special ? 'special' : c.is_fixed ? 'fixed' : c.category === '교양' ? 'edu' : 'ent',
-    c.kind === '본방' ? 'on' : 're',
-    { manual: c.manual, waiting: c.waiting, out: !day.in_month && !props.week.is_reference },
+    // 본방 자리는 회차가 안 올라가도 진한 색, 재방 자리만 연한 색
+    c.kind === '본방' || !c.rerun_mark ? 'on' : 're',
+    { manual: c.manual, waiting: c.waiting, out: !day.in_month && !props.week.is_reference, new: isNewEpisode(c) },
   ]
+}
+
+// 회차가 올라간 칸(새 본방). 회차가 없는 프로그램·특집·고정 편성은 해당 없음
+function isNewEpisode(c) {
+  return c.kind === '본방' && c.show_episode !== false && !c.is_special && !c.is_fixed
 }
 
 function episodeText(c) {
@@ -218,6 +224,7 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
 .c.waiting { background: var(--cell-waiting-bg); }
 .c.waiting::before { background: var(--cell-waiting-bar); }
 .c.waiting .e { color: var(--color-foreground-danger-200); font-weight: var(--font-weight-bold); }
+.c.new .n { color: var(--cell-new-episode); font-weight: var(--font-weight-bold); }
 .c.manual { box-shadow: inset 0 0 0 1.5px var(--cell-manual-ring); }
 .c.out { opacity: var(--dim-out-of-month); }
 .c.sel { outline: 2px solid var(--color-foreground-normal-200); outline-offset: -2px; z-index: 1; }

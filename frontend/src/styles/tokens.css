@@ -116,6 +116,7 @@
   --cell-waiting-bg: var(--red-100);
   --cell-waiting-bar: var(--red-500);
   --cell-manual-ring: var(--gray-700);
+  --cell-new-episode: var(--red-600);   /* 회차가 올라간 칸의 프로그램명 */
   --cell-line: var(--gray-100);
   --cell-height: 38px;
   --cell-height-compact: 26px;

@@ -34,10 +34,11 @@ const fmt = (n) => n.toLocaleString('ko-KR')
     <div class="sep" />
     <h2>범례</h2>
     <div class="legend">
-      <div><span class="sw edu on" />교양 본방</div>
-      <div><span class="sw edu re" />교양 재방</div>
-      <div><span class="sw ent on" />오락 본방</div>
-      <div><span class="sw ent re" />오락 재방</div>
+      <div><span class="sw edu on" />교양 본방 자리</div>
+      <div><span class="sw edu re" />교양 재방 자리</div>
+      <div><span class="sw ent on" />오락 본방 자리</div>
+      <div><span class="sw ent re" />오락 재방 자리</div>
+      <div><span class="newname">빨간 이름</span>회차가 올라간 칸</div>
       <div><span class="sw special" />특집</div>
       <div><span class="sw fixed" />고정 편성</div>
       <div><span class="sw waiting" />본방 대기</div>
@@ -85,5 +86,6 @@ h2 { font-size: var(--text-075); font-weight: var(--font-weight-bold); margin-bo
 .dotx { width: 6px; height: 6px; margin: 0 8px; border-radius: var(--radius-pill); }
 .dotx.in { background: var(--color-background-success-200); }
 .dotx.done { background: var(--color-foreground-hint-100); }
+.newname { color: var(--cell-new-episode); font-weight: var(--font-weight-bold); }
 .sw.manual { box-shadow: inset 0 0 0 1.5px var(--cell-manual-ring); }
 </style>
