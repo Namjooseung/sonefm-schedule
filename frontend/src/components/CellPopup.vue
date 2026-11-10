@@ -8,7 +8,7 @@ const props = defineProps({
   cellKey: { type: String, required: true },     // 'YYYY-MM-DD|시'
   anchor: { type: Object, required: true },      // 칸의 화면 위치 (DOMRect)
 })
-const emit = defineEmits(['close', 'changed', 'pending'])
+const emit = defineEmits(['close', 'changed', 'pending', 'preview'])
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const date = computed(() => props.cellKey.split('|')[0])
@@ -117,7 +117,7 @@ const canStep = computed(() => {
   return c && !c.is_fixed && !c.is_special && c.show_episode !== false
 })
 // 숫자는 누르는 즉시 바꾸고, 연달아 누르면 멈춘 뒤 한 번만 저장한다 (Ctrl+Z도 한 번에 되돌아감)
-const STEP_DELAY = 350
+const STEP_DELAY = 200
 let stepTimer = 0
 let stepValue = null
 function stepEpisode(delta) {
@@ -128,6 +128,7 @@ function stepEpisode(delta) {
   c.rerun_episode_override = next
   c.waiting = false
   stepValue = next
+  emit('preview', props.cellKey, next)     // 뒤쪽 편성표 칸도 바로 바꾼다
   clearTimeout(stepTimer)
   stepTimer = setTimeout(saveStep, STEP_DELAY)
 }

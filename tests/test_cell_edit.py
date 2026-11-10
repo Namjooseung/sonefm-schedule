@@ -263,3 +263,127 @@ def test_본방_자리가_둘인_프로그램도_내렸다_올릴_수_있음():
     assert c["kind"] == "재방" and c["rerun_mark"] is False   # 본방 자리 그대로
     assert a.cell_override("2026-11-12", 13, 83)["ok"]       # 다시 올리면 새 회차
     assert a.get_month(2026, 11)["cells"]["2026-11-12|13"]["kind"] == "본방"
+
+
+# ── 이후 전부: 가져온 칸도 바뀌고, 시작일이 늦은 프로그램도 칸이 사라지지 않는다 ──
+
+def _as_imported(api):
+    from app.db.connection import open_db
+    with open_db(api._cfg.db_path) as conn:
+        conn.execute("UPDATE schedule_cells SET source = 'import', original_slot_id = NULL")
+
+
+def _new_program(api, name="새 프로그램", start="2026-12-25"):
+    r = api.save_program({"name": name, "category": "교양", "cycle_type": "weekly", "start_date": start, "slots": []})
+    assert r["ok"], r
+    return r["program"]["id"]
+
+
+def test_이후_전부는_시작일이_늦은_프로그램이어도_칸이_사라지지_않음(api):
+    pid = _new_program(api)
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"], r
+    assert cell(api, "2026-11-17", 11)["name"] == "새 프로그램"
+    assert cell(api, "2026-11-24", 11)["name"] == "새 프로그램"
+    assert api.get_program(pid)["program"]["start_date"] == "2026-11-17"
+
+
+def test_이후_전부는_가져온_칸도_바꿈(api):
+    _as_imported(api)
+    pid = _new_program(api)
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"], r
+    assert cell(api, "2026-11-10", 11)["name"] == "마을살이 정류장"        # 이전은 그대로
+    for d in ("2026-11-17", "2026-11-24", "2026-12-01"):
+        assert cell(api, d, 11)["name"] == "새 프로그램", d
+    assert cell(api, "2026-11-21", 18)["name"] == "마을살이 정류장"        # 다른 자리는 그대로
+
+
+def test_이후_전부는_직접_고친_칸을_유지하고_알려줌(api):
+    _as_imported(api)
+    assert api.cell_replace("2026-11-24", 11, api.ids["그 삶이다"], "재방", "once")["ok"]
+    pid = _new_program(api)
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"] and "1칸" in r["message"] and "유지" in r["message"]
+    assert cell(api, "2026-11-24", 11)["name"] == "그 삶이다"
+    assert cell(api, "2026-12-01", 11)["name"] == "새 프로그램"
+
+
+def test_이후_전부는_되돌리기로_가져온_칸까지_복구(api):
+    _as_imported(api)
+    pid = _new_program(api)
+    api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert api.undo()["ok"]
+    c = cell(api, "2026-11-24", 11)
+    assert c["name"] == "마을살이 정류장" and c["imported"]
+
+
+def test_종영한_프로그램은_그_뒤로_이후_전부_불가(api):
+    pid = _new_program(api, start="2026-01-05")
+    assert api.end_program(pid, "2026-06-30")["ok"]
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert not r["ok"] and "종영" in r["errors"][0]
+    assert cell(api, "2026-11-17", 11)["name"] == "마을살이 정류장"
+
+
+def test_본방_재방_이후_전부도_가져온_칸에_반영(api):
+    _as_imported(api)
+    assert api.cell_set_kind("2026-11-17", 11, "재방", "after")["ok"]
+    assert [cell(api, d, 11)["kind"] for d in ("2026-11-10", "2026-11-17", "2026-11-24")] == ["본방", "재방", "재방"]
+
+
+def test_규칙이_없는_자리도_이후_전부_가능(api):
+    # 프로그램을 종영시켜 규칙이 없어진 자리의 가져온 칸
+    _as_imported(api)
+    from app.db.connection import open_db
+    with open_db(api._cfg.db_path) as conn:
+        conn.execute("DELETE FROM program_slots WHERE program_id = ? AND weekday = 1", (api.ids["마을살이 정류장"],))
+    assert api.get_cell("2026-11-17", 11)["rule"] is None
+    assert api.get_cell("2026-11-17", 11)["scope_available"]
+    pid = _new_program(api)
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"], r
+    for d in ("2026-11-17", "2026-11-24", "2026-12-01"):
+        assert cell(api, d, 11)["name"] == "새 프로그램", d
+    assert cell(api, "2026-11-10", 11)["name"] == "마을살이 정류장"
+    slots = api.get_program(pid)["program"]["slots"]
+    assert [(s["weekday"], s["hour"], s["valid_from"]) for s in slots] == [(1, 11, "2026-11-17")]
+
+
+def test_이미_자리가_있는데_시작일_때문에_규칙이_없던_프로그램(api):
+    # 사용자 사례: 시작일이 11/6인 프로그램에 10월부터 자리가 있고, 그 뒤 칸은 다른 프로그램(가져온 칸)
+    _as_imported(api)
+    pid = _new_program(api, start="2026-12-25")
+    assert api.cell_replace("2026-11-10", 11, pid, "본방", "after")["ok"]
+    from app.db.connection import open_db
+    with open_db(api._cfg.db_path) as conn:      # 시작일을 다시 늦춰 예전 상태로
+        conn.execute("UPDATE programs SET start_date = '2026-12-25' WHERE id = ?", (pid,))
+        conn.execute("UPDATE schedule_cells SET program_id = ?, source = 'import' WHERE date >= '2026-11-17' AND hour = 11",
+                     (api.ids["마을살이 정류장"],))
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"], r
+    for d in ("2026-11-17", "2026-11-24", "2026-12-01"):
+        assert cell(api, d, 11)["name"] == "새 프로그램", d
+    assert api.get_program(pid)["program"]["start_date"] == "2026-11-17"
+    slots = [s for s in api.get_program(pid)["program"]["slots"] if s["weekday"] == 1 and s["hour"] == 11]
+    assert len(slots) == 1                       # 자리를 겹치게 또 만들지 않는다
+
+
+def test_빈칸에서도_이후_전부(api):
+    pid = _new_program(api)
+    r = api.cell_replace("2026-11-16", 7, pid, "본방", "after")
+    assert r["ok"], r
+    assert cell(api, "2026-11-16", 7)["name"] == "새 프로그램"
+    assert cell(api, "2026-11-23", 7)["name"] == "새 프로그램"
+
+
+def test_이미_바꾼_칸에서_이후_전부를_눌러도_뒤쪽_다른_프로그램_칸까지_바뀜(api):
+    # 사용자 사례: 10/15를 이번만으로 새 프로그램으로 바꿔 둔 뒤 그 칸에서 이후 전부 → 뒤쪽 가져온 칸(다른 프로그램)도 바뀌어야 한다
+    _as_imported(api)
+    pid = _new_program(api)
+    assert api.cell_replace("2026-11-17", 11, pid, "본방", "once")["ok"]
+    r = api.cell_replace("2026-11-17", 11, pid, "본방", "after")
+    assert r["ok"], r
+    for d in ("2026-11-17", "2026-11-24", "2026-12-01"):
+        assert cell(api, d, 11)["name"] == "새 프로그램", d
+    assert cell(api, "2026-11-10", 11)["name"] == "마을살이 정류장"

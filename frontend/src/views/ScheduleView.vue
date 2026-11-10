@@ -186,6 +186,12 @@ async function onCellChanged(message, undoable, warnings = []) {
   else if (message) flash(message)
 }
 
+// 회차 − / + : 저장되기 전에 칸 숫자부터 바꿔 보여준다 (저장 뒤 서버 값으로 다시 맞춰짐)
+function previewEpisode(key, episode) {
+  const c = data.value?.cells[key]
+  if (c) { c.episode = episode; c.waiting = false }
+}
+
 // 팝업이 닫히면서 저장한 회차 변경의 결과 받기
 async function onCellPending(promise) {
   const r = await promise
@@ -311,7 +317,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
     <div v-if="notice" class="toast" :class="{ warn: noticeWarn }" role="status">{{ notice }}</div>
 
-    <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" @pending="onCellPending" />
+    <CellPopup v-if="popup" :cell-key="popup.key" :anchor="popup.rect" @close="closePopup" @changed="onCellChanged" @pending="onCellPending" @preview="previewEpisode" />
 
     <div v-if="bandPick" class="band-pick" :style="{ left: `${bandPick.rect.left + 120}px`, top: `${Math.min(bandPick.rect.bottom + 4, 9999)}px` }">
       <p class="small">어느 날만 바꿀까요?</p>

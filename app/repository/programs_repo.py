@@ -103,6 +103,11 @@ def set_end_date(conn: sqlite3.Connection, program_id: str, end_date: str | None
                  (end_date, now_iso(), program_id))
 
 
+def set_start_date(conn: sqlite3.Connection, program_id: str, start_date: str) -> None:
+    conn.execute("UPDATE programs SET start_date = ?, updated_at = ? WHERE id = ?",
+                 (start_date, now_iso(), program_id))
+
+
 def replace_aliases(conn: sqlite3.Connection, program_id: str, aliases: list[str]) -> None:
     current = get_aliases(conn, program_id)
     if current == aliases:

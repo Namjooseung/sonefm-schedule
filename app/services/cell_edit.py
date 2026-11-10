@@ -2,7 +2,7 @@
 
 - '이번만': 그 칸만 사람이 고친 칸(manual)으로 바꾸고, 원래 나갈 프로그램은 결방 기록을 남긴다.
 - '이후 전부': 편성 자리 이력을 갱신(domain.slot_change)하고 그 날짜부터 이미 만든 칸을 다시 생성한다.
-  사람이 고친 다른 칸과 마감된 달은 건드리지 않는다.
+  같은 요일·시각의 규칙 칸과 엑셀에서 가져온 칸은 바꾸고, 사람이 고친 칸과 마감된 달은 건드리지 않는다.
 - 모든 동작은 변경 기록을 남기고, Ctrl+Z용 직전 상태(undo)를 결과에 담아 돌려준다.
   api.py가 undo를 세션 메모리에 쌓고 화면에는 보내지 않는다.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from app.domain import programs as program_rules
@@ -130,6 +130,54 @@ def _regenerate_from(conn: sqlite3.Connection, d: date) -> int:
     return len(plan.deletes) + len(plan.upserts)
 
 
+def _clear_position_after(conn: sqlite3.Connection, d: date, hour: int) -> tuple[int, int]:
+    """'이후 전부': d부터 같은 요일·시각의 칸을 비워 새 규칙으로 다시 채우게 한다 ("이 날짜부터 이 자리는 ○○").
+
+    누른 칸이 아닌 사람이 고친 칸과 마감된 달은 남긴다. (지운 칸 수, 남긴 사람 칸 수)
+    """
+    last = schedule_repo.max_cell_date(conn)
+    if last is None or last < d:
+        return 0, 0
+    closed = schedule_repo.closed_months(conn)
+    cleared = kept = 0
+    for c in schedule_repo.cells_between(conn, d, last):
+        if c.hour != hour or c.date.weekday() != d.weekday() or _ym_of(c.date) in closed:
+            continue
+        if c.source == "manual" and c.date != d:
+            kept += 1
+            continue
+        schedule_repo.delete_cell(conn, c.date, hour)
+        cleared += 1
+    return cleared, kept
+
+
+def _kept_note(kept: int) -> str:
+    return f", 직접 고친 {kept}칸은 유지" if kept else ""
+
+
+def _open_slot(conn: sqlite3.Connection, program_id: str, d: date, hour: int, role: str) -> str | None:
+    """규칙이 없는 자리의 '이후 전부': 프로그램에 그 자리를 연다. 이미 있으면 시작일만 맞춘다."""
+    target = programs_repo.get_program(conn, program_id)
+    if target is None:
+        return "바꿀 프로그램을 찾지 못했습니다."
+    day = d.isoformat()
+    if target["end_date"] and target["end_date"] < day:
+        return f"{target['name']}은(는) {target['end_date']}에 종영한 프로그램입니다. 종영을 취소한 뒤 다시 해 주세요."
+    same_pos = [s for s in target["slots"] if s["weekday"] == d.weekday() and s["hour"] == hour]
+    covered = any(s["valid_from"] <= day and (s["valid_to"] is None or s["valid_to"] >= day) for s in same_pos)
+    if not covered:
+        later = sorted(s["valid_from"] for s in same_pos if s["valid_from"] > day)
+        new_slot = {"weekday": d.weekday(), "hour": hour, "role": role, "valid_from": day,
+                    "valid_to": (date.fromisoformat(later[0]) - timedelta(days=1)).isoformat() if later else None}
+        _, errors = program_rules.clean_slots([*target["slots"], new_slot], target["cycle_type"])
+        if errors:
+            return errors[0]
+        programs_repo.insert_slot(conn, program_id, d.weekday(), hour, role, day, new_slot["valid_to"])
+    if target["start_date"] and target["start_date"] > day:
+        programs_repo.set_start_date(conn, program_id, day)
+    return None
+
+
 def _apply_slot_change(conn: sqlite3.Connection, slot_id: str, d: date, program_id: str, role: str) -> str | None:
     """편성 자리 이력 갱신. 실패하면 사용자용 오류 문구."""
     old = _slot(conn, slot_id)
@@ -142,6 +190,8 @@ def _apply_slot_change(conn: sqlite3.Connection, slot_id: str, d: date, program_
     target = programs_repo.get_program(conn, program_id)
     if target is None:
         return "바꿀 프로그램을 찾지 못했습니다."
+    if target["end_date"] and target["end_date"] < d.isoformat():
+        return f"{target['name']}은(는) {target['end_date']}에 종영한 프로그램입니다. 종영을 취소한 뒤 다시 해 주세요."
     others = [s for s in target["slots"] if s["id"] != old.id]
     new_slot = {"weekday": old.weekday, "hour": old.hour, "role": role,
                 "valid_from": plan.new_valid_from.isoformat(),
@@ -155,6 +205,9 @@ def _apply_slot_change(conn: sqlite3.Connection, slot_id: str, d: date, program_
         programs_repo.set_slot_valid_to(conn, old.id, plan.close_old_to.isoformat())
     programs_repo.insert_slot(conn, program_id, old.weekday, old.hour, role,
                               new_slot["valid_from"], new_slot["valid_to"])
+    # 시작일이 이 날짜보다 늦으면 규칙이 칸을 만들지 못하므로 당긴다
+    if target["start_date"] and target["start_date"] > d.isoformat():
+        programs_repo.set_start_date(conn, program_id, d.isoformat())
     return None
 
 
@@ -193,8 +246,8 @@ def get_cell(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any) -> Result:
         "matches_rule": bool(row and rule and row["source"] == "rule"),
         "cancellations": [{"name": display.get(c["program_id"], {}).get("name", "?"), "reason": c["reason"]}
                           for c in cancels],
-        # '이후 전부'는 규칙 자리가 있을 때만 (비정기·단발은 본방/재방 전환을 이번만으로)
-        "scope_available": rule_slot is not None,
+        # 교체의 '이후 전부'는 어느 칸에서나 된다. 본방/재방 전환은 규칙 자리가 있을 때만 (비정기는 이번만)
+        "scope_available": True,
         "kind_scope_available": bool(rule_slot and row and row["program_id"] == rule_slot.program_id
                                      and display.get(row["program_id"], {}).get("cycle_type") != "irregular"),
         "locked": _locked(conn, d),
@@ -231,9 +284,9 @@ def set_kind(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, kind: str, sco
         err = _apply_slot_change(conn, rule.original_slot_id, d, row["program_id"], kind)
         if err:
             return _fail(err)
-        schedule_repo.delete_cell(conn, d, hour)
+        _, kept = _clear_position_after(conn, d, hour)
         n = _regenerate_from(conn, d)
-        return f"{_label(d, hour)}부터 {name} 자리를 {kind}으로 (이후 전부, {n}칸 다시 생성)"
+        return f"{_label(d, hour)}부터 {name} 자리를 {kind}으로 (이후 전부, {n}칸 다시 생성{_kept_note(kept)})"
     return _run_edit(conn, d, hour, f"{kind}으로", fn_after, last=schedule_repo.max_cell_date(conn),
                      program_ids=(row["program_id"],))
 
@@ -277,20 +330,21 @@ def replace(conn: sqlite3.Connection, d_raw: Any, hour_raw: Any, program_id: str
     new_name = names[program_id]
 
     if scope == "after":
-        if rule is None:
-            return _fail("이 칸은 편성 자리로 정해진 칸이 아니라 '이후 전부'를 쓸 수 없습니다. 프로그램 화면에서 자리를 추가해 주세요.")
-
         def fn_after() -> str | Result:
-            err = _apply_slot_change(conn, rule.original_slot_id, d, program_id, kind)
+            if rule is not None and rule.program_id != program_id:
+                err = _apply_slot_change(conn, rule.original_slot_id, d, program_id, kind)
+            else:          # 규칙이 없는 자리거나 이미 그 프로그램의 자리
+                err = _open_slot(conn, program_id, d, hour, kind)
             if err:
                 return _fail(err)
             schedule_repo.delete_cancellations_at(conn, d, hour)
-            schedule_repo.delete_cell(conn, d, hour)
+            _, kept = _clear_position_after(conn, d, hour)
             n = _regenerate_from(conn, d)
-            return (f"{_label(d, hour)}부터 {names.get(rule.program_id, '?')} 자리를 {new_name}({kind})으로"
-                    f" (이후 전부, {n}칸 다시 생성)")
+            before = names.get(rule.program_id, "?") if rule else (names.get(row["program_id"], "?") if row else "빈")
+            return (f"{_label(d, hour)}부터 {before} 자리를 {new_name}({kind})으로"
+                    f" (이후 전부, {n}칸 다시 생성{_kept_note(kept)})")
         return _run_edit(conn, d, hour, "교체", fn_after, last=schedule_repo.max_cell_date(conn),
-                         program_ids=(rule.program_id, program_id))
+                         program_ids=tuple(x for x in (rule.program_id if rule else None, program_id) if x))
 
     original = rule.program_id if rule else (row["original_program_id"] if row else None)
     if original is None:
