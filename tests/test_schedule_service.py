@@ -106,11 +106,21 @@ def test_마감된_달은_생성_불가(conn):
     assert not svc.generate(conn, 2026, 11, "all")["ok"]
 
 
-def test_자리_충돌_보고(conn):
+def test_나중에_들어온_자리가_이어감(conn):
     program_svc.save_program(conn, {"name": "새벽 특강", "category": "교양", "cycle_type": "weekly",
                                     "slots": [_slot(0, 6)]})
     r = svc.generate(conn, 2026, 11, "first_week")
-    assert r["slot_conflicts"] and set(r["slot_conflicts"][0]["programs"]) == {"굿모닝!", "새벽 특강"}
+    assert r["slot_conflicts"] == []
+    assert svc.get_month(conn, 2026, 11)["cells"]["2026-11-02|6"]["name"] == "새벽 특강"
+
+
+def test_자리_충돌_보고(conn):
+    # 같은 날 시작한 같은 자리끼리만 충돌
+    for name in ("새벽 특강", "새벽 강의"):
+        program_svc.save_program(conn, {"name": name, "category": "교양", "cycle_type": "weekly",
+                                        "slots": [_slot(0, 7)]})
+    r = svc.generate(conn, 2026, 11, "first_week")
+    assert r["slot_conflicts"] and set(r["slot_conflicts"][0]["programs"]) == {"새벽 특강", "새벽 강의"}
 
 
 def test_공휴일_표시(conn):

@@ -60,7 +60,36 @@ def test_같은_자리_격주_두_프로그램은_번갈아():
     assert cells[(D("2026-11-09"), 10)].program_id == "b"
 
 
+def test_같은_자리가_겹치면_가장_최근에_들어온_프로그램이_이어감():
+    # 11기가 10월부터 같은 자리에 본방으로 들어오면 그 뒤로는 11기 자리
+    old, new = prog("old"), prog("new")
+    slots = [slot("so", "old", 0, 10), slot("sn", "new", 0, 10, valid_from="2026-11-09")]
+    cells, conflicts = _gen([old, new], slots, NOV)
+    assert conflicts == []
+    assert cells[(D("2026-11-02"), 10)].program_id == "old"
+    assert cells[(D("2026-11-09"), 10)].program_id == "new"
+    assert cells[(D("2026-11-30"), 10)].program_id == "new"
+
+
+def test_그_다음에_또_다른_본방이_들어오면_그쪽이_이어감():
+    a, b, c = prog("a"), prog("b"), prog("c")
+    slots = [slot("sa", "a", 0, 10), slot("sb", "b", 0, 10, valid_from="2026-11-09"),
+             slot("sc", "c", 0, 10, valid_from="2026-11-16")]
+    cells, conflicts = _gen([a, b, c], slots, NOV)
+    assert conflicts == []
+    assert [cells[(D(d), 10)].program_id for d in ("2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23")] == ["a", "b", "c", "c"]
+
+
+def test_최근에_들어온_프로그램이_종영하면_이전_프로그램이_다시():
+    old, new = prog("old"), prog("new", end="2026-11-15")
+    slots = [slot("so", "old", 0, 10), slot("sn", "new", 0, 10, valid_from="2026-11-09")]
+    cells, _ = _gen([old, new], slots, NOV)
+    assert cells[(D("2026-11-09"), 10)].program_id == "new"
+    assert cells[(D("2026-11-16"), 10)].program_id == "old"
+
+
 def test_진짜_충돌은_보고():
+    # 같은 날 시작한 같은 우선순위 자리끼리만 충돌
     a, b = prog("a"), prog("b")
     cells, conflicts = _gen([a, b], [slot("sa", "a", 0, 10), slot("sb", "b", 0, 10)], FIRST_WEEK)
     assert len(conflicts) == 1

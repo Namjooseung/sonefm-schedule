@@ -9,7 +9,10 @@
    - 특집·교체 같은 일회성 예외는 manual 칸이라 다른 날짜로 퍼지지 않는다.
 
 같은 칸에 여러 자리가 걸리면 우선순위: 본방 > 재방 자리 > 방송 없는 주 재방 채움.
-같은 우선순위끼리 겹치면 충돌로 보고하고 프로그램 id 순으로 하나를 고른다.
+같은 우선순위끼리 겹치면 가장 최근에 시작한 자리(valid_from이 늦은 쪽)가 이어 간다.
+  예) 토 13시 음악쌀롱 자리에 10월부터 11기가 들어오면 그 뒤로는 11기, 다음에 또 다른 프로그램이 들어오면 그쪽.
+  최근 프로그램이 종영하거나 자리가 끝나면 이전 자리가 다시 살아난다.
+시작일까지 같아 고를 수 없을 때만 충돌로 보고하고 프로그램 id 순으로 하나를 고른다.
 """
 from __future__ import annotations
 
@@ -67,9 +70,9 @@ def build_rule_cells(
                 continue
             candidates.setdefault(s.hour, []).append((_priority(s, kind), p.id, s, kind))
         for hour, cands in candidates.items():
-            cands.sort(key=lambda c: (c[0], c[1]))
+            cands.sort(key=lambda c: (c[0], -c[2].valid_from.toordinal(), c[1]))
             best = cands[0]
-            tied = sorted({c[1] for c in cands if c[0] == best[0]})
+            tied = sorted({c[1] for c in cands if c[0] == best[0] and c[2].valid_from == best[2].valid_from})
             if len(tied) > 1:
                 conflicts.append(SlotConflict(d, hour, tuple(tied)))
             _, pid, s, kind = best
