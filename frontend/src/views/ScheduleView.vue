@@ -1,6 +1,7 @@
 <script setup>
 // 편성표 화면: 월 이동 + 버튼(첫 주 불러오기 / 월단위 생성) + 주 줄 그리드 + 오른쪽 패널.
 // 칸을 누르면 칸 팝업, 고정 편성 띠를 누르면 날짜 고르기. Ctrl+Z로 이번 실행 중 작업을 되돌린다.
+// Ctrl+F로 이 달에서 프로그램 찾기 (Enter 다음, Shift+Enter 이전, Esc 닫기).
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onBeforeUnmount, ref } from 'vue'
 import * as api from '../api.js'
 import MonthDial from '../components/MonthDial.vue'
@@ -119,6 +120,7 @@ async function go(y, m) {
   bandPick.value = null
   refOpen.value = false
   notice.value = ''
+  hitIndex.value = 0
   await load()
 }
 
@@ -216,6 +218,61 @@ async function exportExcel() {
   if (!r.cancelled) flash(r.message)
 }
 
+// ── 찾기 (Ctrl+F): 이 달 소속 주에서 프로그램명으로 칸 찾기 ──
+const searchInput = ref(null)
+const query = ref('')
+const hitIndex = ref(0)
+const norm = (t) => (t || '').toLowerCase().replace(/\s+/g, '')
+const hits = computed(() => {
+  const q = norm(query.value)
+  if (!q || !data.value) return []
+  const days = new Set(data.value.weeks.flatMap((w) => w.days.map((d) => d.date)))
+  return Object.entries(data.value.cells)
+    .filter(([k, c]) => days.has(k.split('|')[0]) && norm(c.name).includes(q))
+    .map(([k]) => k)
+    .sort((a, b) => {
+      const [da, ha] = a.split('|')
+      const [db, hb] = b.split('|')
+      return da === db ? Number(ha) - Number(hb) : da < db ? -1 : 1
+    })
+})
+const hitSet = computed(() => Object.fromEntries(hits.value.map((k) => [k, true])))
+const currentHit = computed(() => hits.value[hitIndex.value] || '')
+
+function focusSearch() {
+  searchInput.value?.focus()
+  searchInput.value?.select()
+}
+function onQuery() {
+  hitIndex.value = 0
+  if (hits.value.length) showHit()
+}
+function stepHit(dir) {
+  const n = hits.value.length
+  if (!n) return
+  hitIndex.value = (hitIndex.value + dir + n) % n
+  showHit()
+}
+async function showHit() {
+  const key = currentHit.value
+  if (!key) return
+  const day = key.split('|')[0]
+  const week = data.value.weeks.find((w) => w.days.some((d) => d.date === day))
+  if (week && folded.value[week.monday]) toggleWeek(week.monday)
+  await nextTick()
+  const el = document.querySelector('.c.cur, .band.cur')
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+function clearSearch() {
+  query.value = ''
+  hitIndex.value = 0
+  searchInput.value?.blur()
+}
+function onSearchKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); stepHit(e.shiftKey ? -1 : 1) }
+  else if (e.key === 'Escape') { e.preventDefault(); clearSearch() }
+}
+
 // ── 되돌리기 (Ctrl+Z) ──
 async function doUndo() {
   if (busy.value) return
@@ -229,6 +286,8 @@ async function doUndo() {
   flash(r.message)
 }
 function onKey(e) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); focusSearch(); return }
+  if (e.key === 'F3' && query.value) { e.preventDefault(); stepHit(e.shiftKey ? -1 : 1); return }
   const t = e.target
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo() }
@@ -257,6 +316,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <button v-else-if="data.status === '마감'" class="btn btn-danger-outline btn-sm" @click="askStatus('unlock')">잠금 해제</button>
           </template>
           <div class="spacer" />
+          <div v-if="data" class="search" role="search">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M20 20l-4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            <input
+              ref="searchInput" v-model="query" class="input input-sm" placeholder="프로그램 찾기 (Ctrl+F)"
+              aria-label="이 달에서 프로그램 찾기" @input="onQuery" @keydown="onSearchKey"
+            />
+            <template v-if="query">
+              <span class="count small" :class="{ none: !hits.length }" aria-live="polite">{{ hits.length ? `${hitIndex + 1}/${hits.length}` : '없음' }}</span>
+              <button class="btn btn-ghost btn-sm icon" :disabled="!hits.length" title="이전 (Shift+Enter)" aria-label="이전 결과" @click="stepHit(-1)">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm icon" :disabled="!hits.length" title="다음 (Enter)" aria-label="다음 결과" @click="stepHit(1)">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm icon" title="찾기 닫기 (Esc)" aria-label="찾기 닫기" @click="clearSearch">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              </button>
+            </template>
+          </div>
           <div class="seg" role="group" aria-label="보기 밀도">
             <button :aria-pressed="density === 'normal'" @click="setDensity('normal')">기본</button>
             <button :aria-pressed="density === 'compact'" @click="setDensity('compact')">압축</button>
@@ -297,6 +375,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           아직 비어 있는 달입니다. <b>첫 주 불러오기</b>로 첫 주를 채운 뒤 개편 사항을 고치고, <b>월단위 생성</b>으로 나머지 주를 채워 주세요.
         </p>
         <MonthGrid v-if="data" :data="data" :today="today" :selected="selected" :folded="folded" :ref-open="refOpen"
+                   :hits="query ? hitSet : null" :current-hit="currentHit"
                    @goto-month="gotoPrevMonth" @select="openCell" @toggle="toggleWeek" @toggle-ref="refOpen = !refOpen" @band="openBand" />
       </div>
     </div>
@@ -353,6 +432,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .row1 { display: flex; align-items: center; gap: var(--space-150); padding-bottom: var(--space-150); flex-wrap: wrap; }
 h1 { font-size: var(--text-400); line-height: var(--leading-400); font-weight: var(--font-weight-bold); }
 .spacer { flex: 1; }
+.search { display: flex; align-items: center; gap: var(--space-050); color: var(--color-foreground-hint-100); }
+.search .input { width: 200px; }
+.search .count { min-width: 40px; text-align: center; color: var(--color-foreground-normal-100); font-variant-numeric: tabular-nums; }
+.search .count.none { color: var(--color-foreground-danger-200); }
+.search .icon { padding: 0; width: var(--control-sm); justify-content: center; }
 .seg {
   display: inline-flex; padding: var(--space-025); gap: var(--space-025); border-radius: var(--radius-300);
   background: var(--color-background-secondary-200);

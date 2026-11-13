@@ -1,6 +1,6 @@
 <script setup>
 // 프로그램 화면: 왼쪽 목록(검색·종영 포함) + 오른쪽 상세 편집.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
 import * as api from '../api.js'
 import ProgramForm from '../components/ProgramForm.vue'
 import BaseDialog from '../components/BaseDialog.vue'
@@ -157,6 +157,22 @@ async function saveSpecial() {
   if (guard({ kind: 'open', id: r.program.id })) { selectedId.value = r.program.id; setDraft(fromServer(r.program)) }
 }
 
+// Ctrl+F: 목록 검색 칸으로
+const searchInput = ref(null)
+function onKey(e) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    searchInput.value?.focus()
+    searchInput.value?.select()
+  }
+}
+function clearQuery() {
+  query.value = ''
+  loadList()
+}
+onActivated(() => window.addEventListener('keydown', onKey))
+onDeactivated(() => window.removeEventListener('keydown', onKey))
+
 onMounted(async () => {
   const c = await api.programChoices()
   if (c.ok) choices.value = c
@@ -174,7 +190,7 @@ onMounted(async () => {
           <button class="btn btn-primary btn-sm" @click="startNew">새 프로그램</button>
           <button class="btn btn-outline btn-sm" @click="openSpecial">특집 등록</button>
         </div>
-        <input v-model="query" class="input" placeholder="이름·별칭 검색" @input="onSearch" />
+        <input ref="searchInput" v-model="query" class="input" placeholder="이름·별칭 검색 (Ctrl+F)" @input="onSearch" @keydown.esc="clearQuery" />
         <label class="check small"><input v-model="includeEnded" type="checkbox" @change="loadList" /> 종영 포함</label>
       </div>
       <p v-if="loadError" class="callout callout-danger small">{{ loadError }}</p>

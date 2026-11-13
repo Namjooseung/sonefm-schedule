@@ -11,6 +11,8 @@ const props = defineProps({
   today: { type: String, required: true },
   selected: { type: String, default: '' },
   folded: { type: Boolean, default: false },   // 접힌 주: 날짜 머리글만 보인다
+  hits: { type: Object, default: null },       // 찾기 중이면 { 칸키: true } — 걸린 칸 강조, 나머지 흐리게
+  currentHit: { type: String, default: '' },   // 지금 보고 있는 찾기 결과 칸키
 })
 const emit = defineEmits(['goto-month', 'select', 'toggle', 'band'])
 
@@ -74,6 +76,25 @@ function onBand(h, ev) {
   emit('band', { hour: h, days: props.week.days, rect: ev.currentTarget.getBoundingClientRect() })
 }
 
+// 찾기: 칸 / 고정 편성 띠(그 시각 7일 중 하나라도 걸리면) 강조
+const keyOf = (d, h) => `${d.date}|${h}`
+function hitClass(d, h) {
+  if (!props.hits) return null
+  const k = keyOf(d, h)
+  return { hit: !!props.hits[k], miss: !props.hits[k], cur: props.currentHit === k }
+}
+function bandHitClass(h) {
+  if (!props.hits) return null
+  const keys = props.week.days.map((d) => keyOf(d, h))
+  const hit = keys.some((k) => props.hits[k])
+  return { hit, miss: !hit, cur: keys.includes(props.currentHit) }
+}
+// 접힌 주에도 찾은 칸 수를 주 이름 옆에 보여준다
+const weekHits = computed(() => {
+  if (!props.hits) return 0
+  return props.week.days.reduce((n, d) => n + props.hours.filter((h) => props.hits[keyOf(d, h)]).length, 0)
+})
+
 const refMonth = computed(() => props.week.days[0].month)
 const isEmpty = computed(() => props.week.days.every((d) => props.hours.every((h) => !cellAt(d.date, h))))
 const collapsed = computed(() => props.week.is_reference && isEmpty.value)
@@ -89,6 +110,7 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
       <button class="wk" :aria-expanded="!folded" :title="folded ? '이 주 펼치기' : '이 주 접기'" @click="emit('toggle')">
         <svg class="chev" :class="{ folded }" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <span class="wk-text"><b>{{ week.label }}</b><span>{{ week.iso_week }}주차</span></span>
+        <span v-if="folded && weekHits" class="wk-hits" :title="`접힌 주에 찾은 칸 ${weekHits}개`">{{ weekHits }}</span>
       </button>
       <div
         v-for="(d, i) in week.days" :key="d.date" class="dh"
@@ -101,13 +123,13 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
     <div v-if="!collapsed && !folded" class="grid">
       <template v-for="h in hours" :key="h">
         <div class="hr">{{ String(h).padStart(2, '0') }}</div>
-        <div v-if="bands[h]" class="band" :title="`매일 ${String(h).padStart(2, '0')}:00 고정 편성 · 눌러서 특정 날만 바꾸기`" @click="onBand(h, $event)">
+        <div v-if="bands[h]" class="band" :class="bandHitClass(h)":title="`매일 ${String(h).padStart(2, '0')}:00 고정 편성 · 눌러서 특정 날만 바꾸기`" @click="onBand(h, $event)">
           <b>{{ bands[h] }}</b><span>매일 {{ String(h).padStart(2, '0') }}:00 · 고정 편성</span>
         </div>
         <template v-else>
           <div
             v-for="d in week.days" :key="d.date" class="c"
-            :class="[cellClass(cellAt(d.date, h), d), { sel: selected === `${d.date}|${h}` }]"
+            :class="[cellClass(cellAt(d.date, h), d), { sel: selected === `${d.date}|${h}` }, hitClass(d, h)]"
             :title="titleText(cellAt(d.date, h), d, h)"
             @click="onSelect(d, h, $event)"
           >
@@ -229,6 +251,14 @@ const collapsed = computed(() => props.week.is_reference && isEmpty.value)
 .c.out { opacity: var(--dim-out-of-month); }
 .c.sel { outline: 2px solid var(--color-foreground-normal-200); outline-offset: -2px; z-index: 1; }
 .week.ref .c { cursor: default; }
+.c.miss, .band.miss { opacity: var(--dim-search-miss); }
+.c.hit, .band.hit { box-shadow: inset 0 0 0 2px var(--cell-search-hit-ring); z-index: 1; }
+.c.cur, .band.cur { box-shadow: inset 0 0 0 3px var(--cell-search-current-ring); z-index: 2; }
+.wk-hits {
+  position: absolute; top: 2px; right: 2px; min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
+  font-size: var(--text-025); line-height: 16px; font-weight: var(--font-weight-bold); text-align: center;
+  background: var(--cell-search-hit-ring); color: var(--color-foreground-inverse);
+}
 
 .band {
   grid-column: 2 / -1; position: relative; display: flex; align-items: center; gap: var(--space-150);

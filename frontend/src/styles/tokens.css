@@ -122,6 +122,9 @@
   --cell-height-compact: 26px;
   --dim-out-of-month: 0.45;
   --dim-reference: 0.6;
+  --dim-search-miss: 0.3;               /* 편성표 찾기 중 일치하지 않는 칸 */
+  --cell-search-hit-ring: var(--orange-500);   /* 찾기에 걸린 칸 테두리 */
+  --cell-search-current-ring: var(--blue-600); /* 지금 보고 있는 찾기 결과 */
   --color-weekday-sat: var(--blue-600);
   --color-weekday-sun: var(--red-600);
 

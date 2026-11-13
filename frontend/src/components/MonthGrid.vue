@@ -8,6 +8,8 @@ defineProps({
   selected: { type: String, default: '' },
   folded: { type: Object, default: () => ({}) },   // { 월요일날짜: true }
   refOpen: { type: Boolean, default: false },      // 참고 줄(전달 마지막 주)은 기본 접힘
+  hits: { type: Object, default: null },           // 찾기 중이면 { 칸키: true }, 아니면 null
+  currentHit: { type: String, default: '' },
 })
 const emit = defineEmits(['goto-month', 'select', 'toggle', 'toggle-ref', 'band'])
 </script>
@@ -21,7 +23,7 @@ const emit = defineEmits(['goto-month', 'select', 'toggle', 'toggle-ref', 'band'
     />
     <WeekRow
       v-for="w in data.weeks" :key="w.monday" :week="w" :cells="data.cells" :hours="data.hours"
-      :today="today" :selected="selected" :folded="!!folded[w.monday]"
+      :today="today" :selected="selected" :folded="!!folded[w.monday]" :hits="hits" :current-hit="currentHit"
       @select="(k, rect) => emit('select', k, rect)" @toggle="emit('toggle', w.monday)" @band="(b) => emit('band', b)"
     />
   </div>
