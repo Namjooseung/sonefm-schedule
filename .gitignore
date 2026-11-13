@@ -15,6 +15,8 @@ packaging/Output/
 
 # 로컬 DB·로그 (실제 데이터는 Documents\SoneFM 에 있음)
 *.db
+# 새 PC용 기본 데이터는 예외로 저장소에 둔다 (app/startup.py 참고)
+!seed/schedule_seed.db
 *.log
 
 # 편집기

@@ -19,7 +19,7 @@ import webview  # noqa: E402
 
 from app import APP_NAME  # noqa: E402
 from app.api import Api  # noqa: E402
-from app.config import frontend_index  # noqa: E402
+from app.config import frontend_index, seed_db_path  # noqa: E402
 from app.logging_setup import setup_logging  # noqa: E402
 from app.startup import prepare  # noqa: E402
 
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log = setup_logging()
     try:
-        started = prepare()
+        started = prepare(seed_db=seed_db_path())
     except Exception:
         log.exception("시작 준비 실패")
         show_error("프로그램을 시작하지 못했습니다.\n"

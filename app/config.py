@@ -82,3 +82,8 @@ def frontend_index() -> Path:
 
 def migrations_dir() -> Path:
     return resource_dir() / "app" / "db" / "migrations"
+
+
+def seed_db_path() -> Path:
+    """저장소에 함께 들어 있는 기본 데이터(씨앗 DB). 새 PC에서 DB가 없을 때 이것으로 시작한다."""
+    return resource_dir() / "seed" / "schedule_seed.db"

@@ -41,3 +41,38 @@ def test_config_json_생성(isolated_home):
     cfg = load_config()
     assert (isolated_home / "config.json").exists()
     assert cfg.backup_keep > 0
+
+
+def _make_seed(path: Path) -> Path:
+    prepare()  # 스키마가 있는 DB를 하나 만든 뒤 표식 행을 넣어 씨앗으로 쓴다
+    src = Path(load_config().db_path)
+    conn = sqlite3.connect(src)
+    conn.execute("CREATE TABLE seed_mark (x)")
+    conn.commit()
+    conn.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    src.replace(path)
+    return path
+
+
+def test_DB가_없으면_씨앗_DB를_복사해_시작(isolated_home, tmp_path):
+    seed = _make_seed(tmp_path / "seed" / "schedule_seed.db")
+    result = prepare(seed_db=seed)
+    with sqlite3.connect(result.config.db_path) as conn:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}
+    assert "seed_mark" in tables
+    assert seed.exists()  # 원본 씨앗은 그대로
+
+
+def test_DB가_이미_있으면_씨앗을_무시(isolated_home, tmp_path):
+    seed = _make_seed(tmp_path / "seed" / "schedule_seed.db")
+    prepare()  # 기존 DB
+    result = prepare(seed_db=seed)
+    with sqlite3.connect(result.config.db_path) as conn:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}
+    assert "seed_mark" not in tables
+
+
+def test_씨앗_파일이_없어도_빈_DB로_시작(isolated_home, tmp_path):
+    result = prepare(seed_db=tmp_path / "없음.db")
+    assert Path(result.config.db_path).exists()
